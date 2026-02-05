@@ -5,8 +5,68 @@ Background worker threads for Qwen3-TTS GUI.
 import torch
 import soundfile as sf
 from PySide6.QtCore import QThread, Signal
+from contextlib import contextmanager
 
 from .constants import MODELS, mode_of
+
+
+def _format_size(size_bytes):
+    """Format bytes to human readable string."""
+    for unit in ['B', 'KB', 'MB', 'GB']:
+        if size_bytes < 1024:
+            return f"{size_bytes:.1f}{unit}"
+        size_bytes /= 1024
+    return f"{size_bytes:.1f}TB"
+
+
+@contextmanager
+def redirect_hf_progress(callback):
+    """
+    Context manager to redirect HuggingFace download progress to a callback.
+
+    Args:
+        callback: Function that takes a message string
+    """
+    try:
+        from huggingface_hub import utils as hf_utils
+
+        # Store original tqdm class
+        original_tqdm = hf_utils.tqdm.tqdm
+
+        # Create a custom tqdm that reports to our callback
+        class CallbackTqdm(original_tqdm):
+            def __init__(self, *args, **kwargs):
+                # Extract description for our messages
+                self._desc = kwargs.get('desc', '')
+                super().__init__(*args, **kwargs)
+
+            def update(self, n=1):
+                super().update(n)
+                if self.total:
+                    pct = 100 * self.n / self.total
+                    size_info = f"{_format_size(self.n)}/{_format_size(self.total)}"
+                    msg = f"Downloading {self._desc}: {pct:.0f}% ({size_info})"
+                    callback(msg)
+
+            def close(self):
+                if self.total and self.n >= self.total:
+                    callback(f"Downloaded {self._desc}: {_format_size(self.total)}")
+                super().close()
+
+        # Monkey-patch
+        hf_utils.tqdm.tqdm = CallbackTqdm
+
+        yield
+
+    except ImportError:
+        # huggingface_hub not available, just yield
+        yield
+    finally:
+        # Restore original if we patched it
+        try:
+            hf_utils.tqdm.tqdm = original_tqdm
+        except (NameError, UnboundLocalError):
+            pass
 
 
 class GenerationWorker(QThread):
@@ -52,15 +112,17 @@ class GenerationWorker(QThread):
                 if self.params.get("flash_attn"):
                     kwargs["attn_implementation"] = "flash_attention_2"
 
-                try:
-                    model = Qwen3TTSModel.from_pretrained(model_id, **kwargs)
-                except Exception:
-                    if "attn_implementation" in kwargs:
-                        self.progress.emit("Flash Attention unavailable, retrying...")
-                        del kwargs["attn_implementation"]
+                # Redirect download progress to our signal
+                with redirect_hf_progress(self.progress.emit):
+                    try:
                         model = Qwen3TTSModel.from_pretrained(model_id, **kwargs)
-                    else:
-                        raise
+                    except Exception:
+                        if "attn_implementation" in kwargs:
+                            self.progress.emit("Flash Attention unavailable, retrying...")
+                            del kwargs["attn_implementation"]
+                            model = Qwen3TTSModel.from_pretrained(model_id, **kwargs)
+                        else:
+                            raise
 
                 self.model_holder["model"] = model
                 self.model_holder["model_id"] = model_id
@@ -194,8 +256,11 @@ class TranscriptionWorker(QThread):
                 from transformers import WhisperProcessor, WhisperForConditionalGeneration
 
                 model_id = "openai/whisper-base"
-                self._model_holder["processor"] = WhisperProcessor.from_pretrained(model_id)
-                self._model_holder["model"] = WhisperForConditionalGeneration.from_pretrained(model_id)
+
+                # Redirect download progress to our signal
+                with redirect_hf_progress(self.progress.emit):
+                    self._model_holder["processor"] = WhisperProcessor.from_pretrained(model_id)
+                    self._model_holder["model"] = WhisperForConditionalGeneration.from_pretrained(model_id)
 
                 if torch.cuda.is_available():
                     self._model_holder["model"] = self._model_holder["model"].to("cuda")
