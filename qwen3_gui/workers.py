@@ -28,6 +28,10 @@ class GenerationWorker(QThread):
 
     def run(self):
         try:
+            # Apply HF cache setting BEFORE importing qwen_tts
+            # (huggingface_hub caches the path at import time)
+            apply_hf_cache_env(get_hf_cache_path())
+
             from qwen_tts import Qwen3TTSModel
 
             model_label = self.params["model_label"]
@@ -37,9 +41,6 @@ class GenerationWorker(QThread):
             # Load or reuse model
             if self.model_holder.get("model") is None or self.model_holder.get("model_id") != model_id:
                 self.progress.emit(f"Loading {model_label}...")
-
-                # Apply HF cache setting before loading
-                apply_hf_cache_env(get_hf_cache_path())
 
                 dtype_map = {
                     "bfloat16": torch.bfloat16,
