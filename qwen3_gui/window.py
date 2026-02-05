@@ -279,6 +279,8 @@ class MainWindow(QMainWindow):
                 self, tr("update_restart_required"),
                 tr("update_restart_msg")
             )
+            # Restart the application
+            self._restart_app()
 
     def _install_update(self):
         """Install the update."""
@@ -288,6 +290,11 @@ class MainWindow(QMainWindow):
         self._update_worker = UpdateWorker(install=True)
         self._update_worker.finished.connect(self._on_update_check_done)
         self._update_worker.start()
+
+    def _restart_app(self):
+        """Restart the application."""
+        QApplication.quit()
+        os.execv(sys.executable, [sys.executable] + sys.argv)
 
     def _show_about(self):
         QMessageBox.about(
