@@ -850,6 +850,55 @@ How many audio clips the AI looks at simultaneously.<br><br>
 <b>Меньше:</b> Медленнее, но работает на скромном железе<br><br>
 <i>Начните с 4, увеличьте если много VRAM</i>""",
     },
+
+    # -------------------------------------------------------------------------
+    # Settings Tab
+    # -------------------------------------------------------------------------
+
+    "tab_settings": {
+        "en": "Settings",
+        "ru": "Настройки",
+    },
+    "hf_cache_settings": {
+        "en": "HuggingFace Model Cache",
+        "ru": "Кэш моделей HuggingFace",
+    },
+    "hf_cache_description": {
+        "en": "Specify a custom directory for downloading and caching AI models. Leave empty to use the system default location.",
+        "ru": "Укажите папку для загрузки и кэширования моделей ИИ. Оставьте пустым для использования системной папки по умолчанию.",
+    },
+    "hf_cache_placeholder": {
+        "en": "Leave empty for system default (e.g., C:\\Users\\...\\huggingface)",
+        "ru": "Оставьте пустым для системного пути (напр., C:\\Users\\...\\huggingface)",
+    },
+    "hf_cache_note": {
+        "en": "Changes take effect on next model download. Existing cached models are not moved.",
+        "ru": "Изменения применятся при следующей загрузке модели. Существующие модели не перемещаются.",
+    },
+    "update_settings": {
+        "en": "Updates",
+        "ru": "Обновления",
+    },
+    "auto_update_on_startup": {
+        "en": "Automatically check for updates on startup",
+        "ru": "Автоматически проверять обновления при запуске",
+    },
+    "save_settings": {
+        "en": "Save Settings",
+        "ru": "Сохранить настройки",
+    },
+    "settings_saved": {
+        "en": "Settings Saved",
+        "ru": "Настройки сохранены",
+    },
+    "settings_saved_msg": {
+        "en": "Settings have been saved successfully.",
+        "ru": "Настройки успешно сохранены.",
+    },
+    "select_hf_cache_dir": {
+        "en": "Select HuggingFace Cache Directory",
+        "ru": "Выберите папку кэша HuggingFace",
+    },
 }
 
 

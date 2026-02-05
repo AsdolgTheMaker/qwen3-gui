@@ -3,7 +3,6 @@ Background worker threads for Qwen3-TTS GUI.
 """
 
 import os
-from contextlib import contextmanager
 from pathlib import Path
 
 import torch
@@ -11,36 +10,20 @@ import soundfile as sf
 from PySide6.QtCore import QThread, Signal
 
 from .constants import MODELS, mode_of
-
-# Local cache directory for HuggingFace models (avoids polluting system cache)
-HF_CACHE_DIR = Path(__file__).parent.parent / "hf_models"
+from .settings import get_hf_cache_path
 
 
-@contextmanager
-def _hf_cache_override():
-    """Temporarily override HuggingFace cache location during model loading."""
-    HF_CACHE_DIR.mkdir(exist_ok=True)
-    cache_path = str(HF_CACHE_DIR)
-    hub_path = str(HF_CACHE_DIR / "hub")
-
-    # Save original values
-    env_keys = ["HF_HOME", "HF_HUB_CACHE", "HUGGINGFACE_HUB_CACHE", "TRANSFORMERS_CACHE"]
-    original = {k: os.environ.get(k) for k in env_keys}
-
-    try:
-        # Set temporary overrides
-        os.environ["HF_HOME"] = cache_path
+def _apply_hf_cache_setting():
+    """Apply HuggingFace cache path from settings."""
+    cache_path = get_hf_cache_path()
+    if cache_path:
+        path = Path(cache_path)
+        path.mkdir(parents=True, exist_ok=True)
+        hub_path = str(path / "hub")
+        os.environ["HF_HOME"] = str(path)
         os.environ["HF_HUB_CACHE"] = hub_path
         os.environ["HUGGINGFACE_HUB_CACHE"] = hub_path
         os.environ["TRANSFORMERS_CACHE"] = hub_path
-        yield
-    finally:
-        # Restore original values
-        for k, v in original.items():
-            if v is None:
-                os.environ.pop(k, None)
-            else:
-                os.environ[k] = v
 
 
 class GenerationWorker(QThread):
@@ -71,6 +54,9 @@ class GenerationWorker(QThread):
             if self.model_holder.get("model") is None or self.model_holder.get("model_id") != model_id:
                 self.progress.emit(f"Loading {model_label}...")
 
+                # Apply HF cache setting before loading
+                _apply_hf_cache_setting()
+
                 dtype_map = {
                     "bfloat16": torch.bfloat16,
                     "float16": torch.float16,
@@ -86,17 +72,15 @@ class GenerationWorker(QThread):
                 if self.params.get("flash_attn"):
                     kwargs["attn_implementation"] = "flash_attention_2"
 
-                # Use context manager to temporarily redirect HF cache during model load
-                with _hf_cache_override():
-                    try:
+                try:
+                    model = Qwen3TTSModel.from_pretrained(model_id, **kwargs)
+                except Exception:
+                    if "attn_implementation" in kwargs:
+                        self.progress.emit("Flash Attention unavailable, retrying...")
+                        del kwargs["attn_implementation"]
                         model = Qwen3TTSModel.from_pretrained(model_id, **kwargs)
-                    except Exception:
-                        if "attn_implementation" in kwargs:
-                            self.progress.emit("Flash Attention unavailable, retrying...")
-                            del kwargs["attn_implementation"]
-                            model = Qwen3TTSModel.from_pretrained(model_id, **kwargs)
-                        else:
-                            raise
+                    else:
+                        raise
 
                 self.model_holder["model"] = model
                 self.model_holder["model_id"] = model_id

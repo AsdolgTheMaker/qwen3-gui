@@ -17,34 +17,10 @@ from PySide6.QtGui import QAction, QActionGroup, QKeySequence
 
 from .constants import APP_VERSION, GITHUB_REPO, OUTPUT_DIR
 from .translations import tr, LANGUAGES, get_language, set_language
-from .widgets import MediaPlayerWidget, OutputLogWidget, TTSTab, DatasetBuilderTab, TrainingTab
+from .widgets import MediaPlayerWidget, OutputLogWidget, TTSTab, DatasetBuilderTab, TrainingTab, SettingsTab
+from .settings import get_auto_update_enabled, set_auto_update_enabled
 
-# Settings file for run.py to read (QSettings not accessible before Qt loads)
 SCRIPT_DIR = Path(__file__).parent.parent.absolute()
-SETTINGS_FILE = SCRIPT_DIR / ".settings.json"
-
-
-def get_auto_update_enabled() -> bool:
-    """Get auto-update setting (readable by run.py)."""
-    try:
-        if SETTINGS_FILE.exists():
-            data = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
-            return data.get("auto_update", True)
-    except Exception:
-        pass
-    return True  # Default: enabled
-
-
-def set_auto_update_enabled(enabled: bool):
-    """Save auto-update setting."""
-    try:
-        data = {}
-        if SETTINGS_FILE.exists():
-            data = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
-        data["auto_update"] = enabled
-        SETTINGS_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
-    except Exception:
-        pass
 
 
 class UpdateWorker(QThread):
@@ -139,6 +115,10 @@ class MainWindow(QMainWindow):
         # Training tab (with access to log)
         self.training_tab = TrainingTab(self.output_log)
         self.tabs.addTab(self.training_tab, tr("tab_training"))
+
+        # Settings tab
+        self.settings_tab = SettingsTab()
+        self.tabs.addTab(self.settings_tab, tr("tab_settings"))
 
         splitter.addWidget(self.tabs)
 

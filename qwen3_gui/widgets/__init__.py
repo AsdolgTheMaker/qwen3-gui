@@ -7,6 +7,7 @@ from .output_log import OutputLogWidget
 from .tts_tab import TTSTab
 from .dataset_tab import DatasetBuilderTab
 from .training_tab import TrainingTab
+from .settings_tab import SettingsTab
 
 __all__ = [
     "MediaPlayerWidget",
@@ -14,4 +15,5 @@ __all__ = [
     "TTSTab",
     "DatasetBuilderTab",
     "TrainingTab",
+    "SettingsTab",
 ]
