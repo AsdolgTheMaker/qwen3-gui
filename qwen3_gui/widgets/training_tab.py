@@ -228,6 +228,22 @@ class TrainingTab(QWidget):
         """Handle progress signal from worker."""
         self._log("log_progress", message)
 
+        # Parse download percentage if present (e.g., "Downloading: 50%")
+        if "%" in message and "Downloading" in message:
+            import re
+            match = re.search(r'(\d+)%', message)
+            if match:
+                pct = int(match.group(1))
+                # Switch to 0-100 range for download progress
+                if self.progress_bar.maximum() != 100:
+                    self.progress_bar.setRange(0, 100)
+                self.progress_bar.setValue(pct)
+        elif "Step 3/3" in message:
+            # Reset to epoch range when training starts
+            epochs = self.epochs_spin.value()
+            self.progress_bar.setRange(0, epochs)
+            self.progress_bar.setValue(0)
+
     def _on_log(self, message: str):
         """Handle log signal from worker."""
         self._log("log", message)
