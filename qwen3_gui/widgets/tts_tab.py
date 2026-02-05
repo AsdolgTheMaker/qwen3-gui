@@ -504,9 +504,12 @@ class TTSTab(QWidget):
         s.setValue("model", self.model_combo.currentIndex())
         s.setValue("language", self.lang_combo.currentIndex())
         s.setValue("speaker", self.speaker_combo.currentIndex())
+        s.setValue("text_prompt", self.text_edit.toPlainText())
         s.setValue("instruction", self.instruct_edit.toPlainText())
         s.setValue("ref_audio", self.ref_path_edit.text())
+        s.setValue("ref_transcript", self.ref_text_edit.toPlainText())
         s.setValue("xvector", self.xvector_check.isChecked())
+        s.setValue("output_path", self.output_path_edit.text())
         s.setValue("temperature", self.temp_spin.value())
         s.setValue("top_k", self.topk_spin.value())
         s.setValue("top_p", self.topp_spin.value())
@@ -535,9 +538,16 @@ class TTSTab(QWidget):
         if 0 <= idx < self.speaker_combo.count():
             self.speaker_combo.setCurrentIndex(idx)
 
+        self.text_edit.setPlainText(s.value("text_prompt", "", type=str))
         self.instruct_edit.setPlainText(s.value("instruction", "", type=str))
         self.ref_path_edit.setText(s.value("ref_audio", "", type=str))
+        self.ref_text_edit.setPlainText(s.value("ref_transcript", "", type=str))
         self.xvector_check.setChecked(s.value("xvector", False, type=bool))
+
+        output_path = s.value("output_path", "", type=str)
+        if output_path:
+            self.output_path_edit.setText(output_path)
+
         self.temp_spin.setValue(s.value("temperature", 0.9, type=float))
         self.topk_spin.setValue(s.value("top_k", 50, type=int))
         self.topp_spin.setValue(s.value("top_p", 1.0, type=float))

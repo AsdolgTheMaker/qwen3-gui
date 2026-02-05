@@ -230,6 +230,11 @@ class MainWindow(QMainWindow):
             )
 
     def closeEvent(self, event):
+        # Save all tab states before closing
+        self.tts_tab._save_state()
+        self.dataset_tab._save_state()
+        self.training_tab._save_state()
+
         settings = QSettings("AsdolgTheMaker", "Qwen3TTS")
         settings.setValue("geometry", self.saveGeometry())
         super().closeEvent(event)
