@@ -282,12 +282,13 @@ class TrainingWorker(QThread):
                 self.log.emit("Tokenizing audio files with Qwen3-TTS-Tokenizer...")
 
                 try:
-                    prepare_training_data(
-                        input_jsonl=raw_jsonl,
-                        output_jsonl=prepared_jsonl,
-                        device=device,
-                        progress_callback=self.log.emit
-                    )
+                    with capture_download_progress(self.progress.emit):
+                        prepare_training_data(
+                            input_jsonl=raw_jsonl,
+                            output_jsonl=prepared_jsonl,
+                            device=device,
+                            progress_callback=self.log.emit
+                        )
                 except Exception as e:
                     self.finished.emit(False, f"Data preparation failed: {e}")
                     return
@@ -301,19 +302,20 @@ class TrainingWorker(QThread):
                 self.log.emit(f"Starting fine-tuning for {epochs} epochs...")
 
                 try:
-                    checkpoint = run_training(
-                        train_jsonl=prepared_jsonl,
-                        output_dir=output_dir,
-                        speaker_name=model_name,
-                        base_model=base_model,
-                        batch_size=batch_size,
-                        learning_rate=learning_rate,
-                        num_epochs=epochs,
-                        device=device,
-                        progress_callback=self.log.emit,
-                        epoch_callback=lambda e, t, l: self.epoch_progress.emit(e, t, l),
-                        cancel_check=self._is_cancelled
-                    )
+                    with capture_download_progress(self.progress.emit):
+                        checkpoint = run_training(
+                            train_jsonl=prepared_jsonl,
+                            output_dir=output_dir,
+                            speaker_name=model_name,
+                            base_model=base_model,
+                            batch_size=batch_size,
+                            learning_rate=learning_rate,
+                            num_epochs=epochs,
+                            device=device,
+                            progress_callback=self.log.emit,
+                            epoch_callback=lambda e, t, l: self.epoch_progress.emit(e, t, l),
+                            cancel_check=self._is_cancelled
+                        )
                 except Exception as e:
                     self.finished.emit(False, f"Training failed: {e}")
                     return
