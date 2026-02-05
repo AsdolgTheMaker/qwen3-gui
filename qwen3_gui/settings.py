@@ -57,3 +57,11 @@ def apply_hf_cache_env(path: str):
         p.mkdir(parents=True, exist_ok=True)
         # HF_HOME is the main variable - others derive from it
         os.environ["HF_HOME"] = path
+
+        # If huggingface_hub was already imported, reload its constants
+        # to pick up the new env var value
+        import sys
+        if "huggingface_hub.constants" in sys.modules:
+            import importlib
+            from huggingface_hub import constants
+            importlib.reload(constants)

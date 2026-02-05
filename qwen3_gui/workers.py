@@ -29,7 +29,6 @@ class GenerationWorker(QThread):
     def run(self):
         try:
             # Apply HF cache setting BEFORE importing qwen_tts
-            # (huggingface_hub caches the path at import time)
             apply_hf_cache_env(get_hf_cache_path())
 
             from qwen_tts import Qwen3TTSModel

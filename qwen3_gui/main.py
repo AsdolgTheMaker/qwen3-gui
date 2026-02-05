@@ -4,6 +4,10 @@ Application entry point and main function.
 
 import sys
 
+# Apply HF cache setting FIRST, before any other imports that might load huggingface_hub
+from .settings import get_hf_cache_path, apply_hf_cache_env
+apply_hf_cache_env(get_hf_cache_path())
+
 from PySide6.QtWidgets import QApplication, QToolTip, QStyleFactory
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
