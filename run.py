@@ -118,20 +118,16 @@ def _get_remote_version() -> str:
         data = _fetch_json(GITHUB_API_URL)
         return data.get("tag_name", "").lstrip("v")
     except Exception:
-        # If no releases, try to get version from main branch
+        # If no releases, try to get version from main branch via GitHub Contents API
+        # (raw.githubusercontent.com has aggressive CDN caching)
         try:
-            raw_url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/main/qwen3_gui/__init__.py"
-            # Add cache-busting to avoid GitHub CDN caching
-            cache_bust = f"?_={int(time.time())}"
-            req = Request(raw_url + cache_bust, headers={
-                "User-Agent": "Qwen3-TTS-GUI-Updater",
-                "Cache-Control": "no-cache",
-            })
-            with urlopen(req, timeout=10) as response:
-                content = response.read().decode("utf-8")
-                for line in content.splitlines():
-                    if line.startswith("__version__"):
-                        return line.split("=")[1].strip().strip('"\'')
+            import base64
+            api_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/qwen3_gui/__init__.py"
+            data = _fetch_json(api_url)
+            content = base64.b64decode(data["content"]).decode("utf-8")
+            for line in content.splitlines():
+                if line.startswith("__version__"):
+                    return line.split("=")[1].strip().strip('"\'')
         except Exception:
             pass
     return "0.0.0"
