@@ -86,18 +86,12 @@ def prepare_training_data(
         Number of samples processed
     """
     from qwen_tts import Qwen3TTSTokenizer
-    import torch
 
     if progress_callback:
         progress_callback(f"Loading tokenizer ({TOKENIZER_MODEL})...")
 
-    # Load tokenizer (runs on CPU by default, handles device internally)
-    tokenizer = Qwen3TTSTokenizer.from_pretrained(TOKENIZER_MODEL)
-
-    # Move model to GPU if available for faster processing
-    if device.startswith("cuda") and torch.cuda.is_available():
-        if hasattr(tokenizer, 'model') and hasattr(tokenizer.model, 'to'):
-            tokenizer.model = tokenizer.model.to(device)
+    # Load tokenizer with device_map for GPU support
+    tokenizer = Qwen3TTSTokenizer.from_pretrained(TOKENIZER_MODEL, device_map=device)
 
     # Load input data
     data_list = []
