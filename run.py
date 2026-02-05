@@ -2,18 +2,33 @@
 Qwen3-TTS GUI Launcher
 ======================
 Self-deploying script: creates a venv, installs dependencies,
-then launches the PySide6-based GUI for text-to-speech generation.
+auto-updates from GitHub, then launches the PySide6-based GUI.
 
-Usage:  python run.py
+Usage:
+    python run.py              # Normal launch with auto-update
+    python run.py --no-update  # Skip update check
+    python run.py --force-update  # Force re-download even if up to date
 """
 
 import sys
 import os
 import subprocess
+import shutil
+import json
+import tempfile
+import zipfile
 from pathlib import Path
+from urllib.request import urlopen, Request
+from urllib.error import URLError
 
 SCRIPT_DIR = Path(__file__).parent.absolute()
 VENV_DIR = SCRIPT_DIR / ".venv"
+PACKAGE_DIR = SCRIPT_DIR / "qwen3_gui"
+VERSION_FILE = PACKAGE_DIR / "__init__.py"
+
+GITHUB_REPO = "AsdolgTheMaker/qwen3-gui"
+GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+GITHUB_ZIP_URL = f"https://github.com/{GITHUB_REPO}/archive/refs/heads/main.zip"
 
 if sys.platform == "win32":
     VENV_PYTHON = VENV_DIR / "Scripts" / "python.exe"
@@ -21,6 +36,174 @@ if sys.platform == "win32":
 else:
     VENV_PYTHON = VENV_DIR / "bin" / "python"
     VENV_PIP = VENV_DIR / "bin" / "pip"
+
+
+# ---------------------------------------------------------------------------
+# Version utilities
+# ---------------------------------------------------------------------------
+
+def _get_local_version() -> str:
+    """Get the currently installed version."""
+    if not VERSION_FILE.exists():
+        return "0.0.0"
+    try:
+        content = VERSION_FILE.read_text(encoding="utf-8")
+        for line in content.splitlines():
+            if line.startswith("__version__"):
+                # Extract version from: __version__ = "1.0.0"
+                return line.split("=")[1].strip().strip('"\'')
+    except Exception:
+        pass
+    return "0.0.0"
+
+
+def _parse_version(version: str) -> tuple:
+    """Parse version string to tuple for comparison."""
+    try:
+        parts = version.lstrip("v").split(".")
+        return tuple(int(p) for p in parts[:3])
+    except Exception:
+        return (0, 0, 0)
+
+
+def _version_gt(v1: str, v2: str) -> bool:
+    """Check if v1 > v2."""
+    return _parse_version(v1) > _parse_version(v2)
+
+
+# ---------------------------------------------------------------------------
+# Auto-updater
+# ---------------------------------------------------------------------------
+
+def _fetch_json(url: str, timeout: int = 10) -> dict:
+    """Fetch JSON from URL."""
+    req = Request(url, headers={"User-Agent": "Qwen3-TTS-GUI-Updater"})
+    with urlopen(req, timeout=timeout) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def _download_file(url: str, dest: Path, timeout: int = 60):
+    """Download file from URL."""
+    req = Request(url, headers={"User-Agent": "Qwen3-TTS-GUI-Updater"})
+    with urlopen(req, timeout=timeout) as response:
+        with open(dest, "wb") as f:
+            shutil.copyfileobj(response, f)
+
+
+def _get_remote_version() -> str:
+    """Get the latest version from GitHub releases."""
+    try:
+        data = _fetch_json(GITHUB_API_URL)
+        return data.get("tag_name", "").lstrip("v")
+    except Exception:
+        # If no releases, try to get version from main branch
+        try:
+            raw_url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/main/qwen3_gui/__init__.py"
+            req = Request(raw_url, headers={"User-Agent": "Qwen3-TTS-GUI-Updater"})
+            with urlopen(req, timeout=10) as response:
+                content = response.read().decode("utf-8")
+                for line in content.splitlines():
+                    if line.startswith("__version__"):
+                        return line.split("=")[1].strip().strip('"\'')
+        except Exception:
+            pass
+    return "0.0.0"
+
+
+def _perform_update() -> bool:
+    """Download and install the latest version. Returns True if successful."""
+    print("[update] Downloading latest version...")
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmpdir = Path(tmpdir)
+        zip_path = tmpdir / "repo.zip"
+
+        try:
+            _download_file(GITHUB_ZIP_URL, zip_path)
+        except Exception as e:
+            print(f"[update] Download failed: {e}")
+            return False
+
+        print("[update] Extracting...")
+        try:
+            with zipfile.ZipFile(zip_path, "r") as zf:
+                zf.extractall(tmpdir)
+        except Exception as e:
+            print(f"[update] Extraction failed: {e}")
+            return False
+
+        # Find the extracted folder (usually repo-name-main)
+        extracted_dirs = [d for d in tmpdir.iterdir() if d.is_dir()]
+        if not extracted_dirs:
+            print("[update] No directory found in archive")
+            return False
+
+        extracted_root = extracted_dirs[0]
+        new_package = extracted_root / "qwen3_gui"
+
+        if not new_package.exists():
+            print("[update] Package folder not found in archive")
+            return False
+
+        # Backup current package (just in case)
+        backup_dir = SCRIPT_DIR / ".qwen3_gui_backup"
+        if PACKAGE_DIR.exists():
+            if backup_dir.exists():
+                shutil.rmtree(backup_dir)
+            shutil.move(str(PACKAGE_DIR), str(backup_dir))
+
+        # Install new package
+        try:
+            shutil.copytree(str(new_package), str(PACKAGE_DIR))
+            # Remove backup on success
+            if backup_dir.exists():
+                shutil.rmtree(backup_dir)
+            print("[update] Update successful!")
+            return True
+        except Exception as e:
+            print(f"[update] Installation failed: {e}")
+            # Restore backup
+            if backup_dir.exists():
+                if PACKAGE_DIR.exists():
+                    shutil.rmtree(PACKAGE_DIR)
+                shutil.move(str(backup_dir), str(PACKAGE_DIR))
+            return False
+
+
+def check_for_updates(force: bool = False) -> bool:
+    """
+    Check for updates and install if available.
+    Returns True if an update was installed.
+    """
+    local_version = _get_local_version()
+    print(f"[update] Current version: {local_version}")
+
+    try:
+        print("[update] Checking for updates...")
+        remote_version = _get_remote_version()
+
+        if remote_version == "0.0.0":
+            print("[update] Could not determine remote version, skipping update")
+            return False
+
+        print(f"[update] Latest version: {remote_version}")
+
+        if force or _version_gt(remote_version, local_version):
+            if force:
+                print("[update] Forcing update...")
+            else:
+                print(f"[update] New version available: {remote_version}")
+            return _perform_update()
+        else:
+            print("[update] Already up to date")
+            return False
+
+    except URLError as e:
+        print(f"[update] Network error (offline?): {e.reason}")
+        return False
+    except Exception as e:
+        print(f"[update] Update check failed: {e}")
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -107,7 +290,7 @@ def _ensure_deps():
     print("[setup] Dependencies installed successfully.")
 
 
-def bootstrap():
+def bootstrap(skip_update: bool = False, force_update: bool = False):
     """Bootstrap the application environment."""
     if _in_venv():
         # Already in venv, just check deps
@@ -122,12 +305,21 @@ def bootstrap():
             ])
         return
 
+    # Check for updates before setting up venv (uses system Python's urllib)
+    if not skip_update:
+        check_for_updates(force=force_update)
+
     # Not in venv - set up and re-exec
     _ensure_venv()
     _ensure_deps()
 
+    # Pass through the update flags
+    args = [str(VENV_PYTHON), str(Path(__file__).absolute())]
+    args.append("--no-update")  # Already updated, don't check again
+    args.extend([a for a in sys.argv[1:] if a not in ("--no-update", "--force-update")])
+
     print("[setup] Launching inside virtual environment ...")
-    os.execv(str(VENV_PYTHON), [str(VENV_PYTHON), str(Path(__file__).absolute())] + sys.argv[1:])
+    os.execv(str(VENV_PYTHON), args)
 
 
 # ---------------------------------------------------------------------------
@@ -135,7 +327,11 @@ def bootstrap():
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    bootstrap()
+    # Parse arguments
+    skip_update = "--no-update" in sys.argv
+    force_update = "--force-update" in sys.argv
+
+    bootstrap(skip_update=skip_update, force_update=force_update)
 
     # Import and run the application
     from qwen3_gui import main
