@@ -95,9 +95,33 @@ class TTSTab(QWidget):
         scroll_layout.addWidget(self.speaker_group)
 
         # Text prompt
-        text_group = QGroupBox(tr("text_to_speak"))
+        text_group = QGroupBox()
         set_tooltip(text_group, "text_prompt")
         text_layout = QVBoxLayout(text_group)
+
+        # Header with title and help button
+        text_header = QHBoxLayout()
+        text_header.addWidget(QLabel(f"<b>{tr('text_to_speak')}</b>"))
+        text_header.addStretch()
+
+        self.text_help_btn = QPushButton("?")
+        self.text_help_btn.setFixedSize(20, 20)
+        self.text_help_btn.setStyleSheet("""
+            QPushButton {
+                border-radius: 10px;
+                background-color: #6b7280;
+                color: white;
+                font-weight: bold;
+                font-size: 12px;
+            }
+            QPushButton:hover {
+                background-color: #4b5563;
+            }
+        """)
+        self.text_help_btn.clicked.connect(self._show_text_tips)
+        text_header.addWidget(self.text_help_btn)
+
+        text_layout.addLayout(text_header)
 
         self.text_edit = QTextEdit()
         self.text_edit.setPlaceholderText(tr("text_placeholder"))
@@ -333,6 +357,14 @@ class TTSTab(QWidget):
 
     def _on_random_seed_toggled(self, checked: bool):
         self.seed_spin.setEnabled(not checked)
+
+    def _show_text_tips(self):
+        """Show tips for controlling speech output."""
+        QMessageBox.information(
+            self,
+            tr("text_tips_title"),
+            tr("text_tips_content")
+        )
 
     def _browse_ref(self):
         path, _ = QFileDialog.getOpenFileName(

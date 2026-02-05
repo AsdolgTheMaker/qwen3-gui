@@ -82,6 +82,78 @@ _TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "en": "Enter the text you want the AI to speak...",
         "ru": "Введите текст, который должен озвучить ИИ...",
     },
+    "text_tips_title": {
+        "en": "Tips for Better Speech",
+        "ru": "Советы для лучшей речи",
+    },
+    "text_tips_content": {
+        "en": """<h3>Controlling Speech Output</h3>
+
+<p><b>Punctuation affects prosody:</b></p>
+<ul>
+<li><b>.</b> (period) → pause</li>
+<li><b>!</b> → emphasis/excitement</li>
+<li><b>?</b> → rising intonation</li>
+<li><b>...</b> → hesitation, trailing off</li>
+<li><b>,</b> → short pause</li>
+</ul>
+
+<p><b>For stress/emphasis:</b></p>
+<ul>
+<li>Use CAPS: "I didn't say he STOLE it"</li>
+<li>Use instruction field: "Emphasize the word 'never'"</li>
+</ul>
+
+<p><b>For pronunciation:</b></p>
+<ul>
+<li>Add hyphens: "Cour-a-geous"</li>
+<li>Spell phonetically: "Keev" instead of "Kyiv"</li>
+<li>Rephrase if needed</li>
+</ul>
+
+<p><b>Using the Instruction field:</b></p>
+<ul>
+<li>"Speak slowly and clearly"</li>
+<li>"Read with a sad tone"</li>
+<li>"Emphasize key words"</li>
+<li>"Speak like a news anchor"</li>
+</ul>
+
+<p><i>Note: Qwen3-TTS doesn't support SSML markup.</i></p>""",
+        "ru": """<h3>Управление речью</h3>
+
+<p><b>Пунктуация влияет на просодию:</b></p>
+<ul>
+<li><b>.</b> (точка) → пауза</li>
+<li><b>!</b> → акцент/эмоция</li>
+<li><b>?</b> → вопросительная интонация</li>
+<li><b>...</b> → неуверенность, затухание</li>
+<li><b>,</b> → короткая пауза</li>
+</ul>
+
+<p><b>Для ударения/акцента:</b></p>
+<ul>
+<li>ЗАГЛАВНЫЕ буквы: "Я не говорил что он УКРАЛ"</li>
+<li>Поле инструкции: "Сделай акцент на слове 'никогда'"</li>
+</ul>
+
+<p><b>Для произношения:</b></p>
+<ul>
+<li>Добавьте дефисы: "Му-же-ствен-ный"</li>
+<li>Пишите фонетически</li>
+<li>Перефразируйте если нужно</li>
+</ul>
+
+<p><b>Использование поля Инструкция:</b></p>
+<ul>
+<li>"Говори медленно и чётко"</li>
+<li>"Читай с грустным тоном"</li>
+<li>"Выделяй ключевые слова"</li>
+<li>"Говори как диктор новостей"</li>
+</ul>
+
+<p><i>Примечание: Qwen3-TTS не поддерживает разметку SSML.</i></p>""",
+    },
     "instruction_optional": {
         "en": "Instruction (optional)",
         "ru": "Инструкция (опционально)",
