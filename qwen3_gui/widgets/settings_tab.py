@@ -85,11 +85,13 @@ class SettingsTab(QWidget):
 
     def _load_settings(self):
         """Load current settings into UI."""
-        # Get current HF cache path from env or saved setting
+        # Get current HF cache path: saved setting > env var > default
         hf_path = get_hf_cache_path()
         if not hf_path:
-            # Show current env var value
             hf_path = os.environ.get("HF_HOME", "")
+        if not hf_path:
+            # Show HuggingFace default cache location
+            hf_path = str(Path.home() / ".cache" / "huggingface")
         self.hf_cache_edit.setText(hf_path)
         self.auto_update_check.setChecked(get_auto_update_enabled())
 
