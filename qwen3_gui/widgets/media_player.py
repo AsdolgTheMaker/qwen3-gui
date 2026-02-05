@@ -1,28 +1,57 @@
 """
 Built-in media player widget for audio playback.
+Uses sounddevice for reliable playback instead of Qt's QMediaPlayer.
 """
 
+import threading
 from pathlib import Path
+
+import numpy as np
+import soundfile as sf
 
 from PySide6.QtWidgets import (
     QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QSlider
 )
-from PySide6.QtCore import Qt, QUrl
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QFont
-from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 
 from ..translations import tr
+
+# Try to import sounddevice, fall back gracefully
+try:
+    import sounddevice as sd
+    HAS_SOUNDDEVICE = True
+except ImportError:
+    HAS_SOUNDDEVICE = False
 
 
 class MediaPlayerWidget(QFrame):
     """Built-in media player for testing generated audio."""
 
+    # Signal for logging messages to GUI log
+    log_signal = Signal(str)
+    log_error_signal = Signal(str)
+
     def __init__(self):
         super().__init__()
         self.setFrameStyle(QFrame.StyledPanel | QFrame.Sunken)
         self._current_file = None
-        self._file_duration_ms = 0
+        self._audio_data = None
+        self._sample_rate = 0
+        self._duration_ms = 0
+        self._playing = False
+        self._paused = False
+        self._position_ms = 0
+        self._stream = None
+        self._play_thread = None
+        self._lock = threading.Lock()
+
         self._setup_ui()
+
+        # Timer for updating position during playback
+        self._update_timer = QTimer()
+        self._update_timer.timeout.connect(self._update_playback_position)
+        self._update_timer.setInterval(50)  # Update every 50ms
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -38,16 +67,11 @@ class MediaPlayerWidget(QFrame):
         self.file_label.setStyleSheet("color: #666;")
         layout.addWidget(self.file_label)
 
-        # Player setup
-        self.player = QMediaPlayer()
-        self.audio_output = QAudioOutput()
-        self.player.setAudioOutput(self.audio_output)
-        self.audio_output.setVolume(0.8)
-
         # Progress slider
         self.progress_slider = QSlider(Qt.Horizontal)
         self.progress_slider.setEnabled(False)
-        self.progress_slider.sliderMoved.connect(self._seek)
+        self.progress_slider.sliderPressed.connect(self._on_slider_pressed)
+        self.progress_slider.sliderReleased.connect(self._on_slider_released)
         layout.addWidget(self.progress_slider)
 
         # Time labels
@@ -85,89 +109,184 @@ class MediaPlayerWidget(QFrame):
 
         layout.addLayout(btn_layout)
 
-        # Connect signals
-        self.player.positionChanged.connect(self._update_position)
-        self.player.durationChanged.connect(self._update_duration)
-        self.player.playbackStateChanged.connect(self._state_changed)
-        self.player.mediaStatusChanged.connect(self._on_media_status)
-
-        # Track if we're seeking to prevent slider jumps
+        self._volume = 0.8
         self._seeking = False
-        self.progress_slider.sliderPressed.connect(self._on_slider_pressed)
-        self.progress_slider.sliderReleased.connect(self._on_slider_released)
 
     def load_file(self, path: str):
         """Load an audio file for playback."""
+        # Stop any current playback
+        self._stop()
+
         self._current_file = path
         self.file_label.setText(Path(path).name)
 
-        # Get duration from soundfile first (more reliable for WAV)
-        self._file_duration_ms = self._get_file_duration(path)
-
-        self.player.setSource(QUrl.fromLocalFile(path))
-        self.btn_play.setEnabled(True)
-        self.btn_stop.setEnabled(True)
-        self.progress_slider.setEnabled(True)
-
-        # Set duration immediately if we have it from soundfile
-        if self._file_duration_ms > 0:
-            self._update_duration(self._file_duration_ms)
-
-    def _get_file_duration(self, path: str) -> int:
-        """Get file duration in milliseconds using soundfile."""
         try:
-            import soundfile as sf
-            info = sf.info(path)
-            return int(info.duration * 1000)
-        except Exception:
-            return 0
+            # Load audio data
+            self._audio_data, self._sample_rate = sf.read(path, dtype='float32')
 
-    def _on_media_status(self, status):
-        """Handle media status changes to get accurate duration."""
-        if status == QMediaPlayer.LoadedMedia:
-            # Use soundfile duration if available, otherwise Qt's
-            if self._file_duration_ms > 0:
-                self._update_duration(self._file_duration_ms)
-            else:
-                duration = self.player.duration()
-                if duration > 0:
-                    self._update_duration(duration)
+            # Convert mono to stereo if needed
+            if len(self._audio_data.shape) == 1:
+                self._audio_data = np.column_stack([self._audio_data, self._audio_data])
+
+            # Calculate duration
+            self._duration_ms = int(len(self._audio_data) / self._sample_rate * 1000)
+            self._position_ms = 0
+
+            # Update UI
+            self.progress_slider.setRange(0, self._duration_ms)
+            self.progress_slider.setValue(0)
+            mins, secs = divmod(self._duration_ms // 1000, 60)
+            self.time_total.setText(f"{mins}:{secs:02d}")
+            self.time_current.setText("0:00")
+
+            self.btn_play.setEnabled(True)
+            self.btn_stop.setEnabled(True)
+            self.progress_slider.setEnabled(True)
+
+            # Log success
+            self.log_signal.emit(f"MediaPlayer: Loaded {Path(path).name} ({mins}:{secs:02d}, {self._sample_rate}Hz)")
+
+        except Exception as e:
+            self.log_error_signal.emit(f"MediaPlayer: Error loading file: {e}")
+            self.file_label.setText(f"Error: {e}")
+
+    def _toggle_play(self):
+        if self._playing and not self._paused:
+            self._pause()
+        else:
+            self._play()
+
+    def _play(self):
+        if not HAS_SOUNDDEVICE or self._audio_data is None:
+            return
+
+        if self._paused:
+            # Resume from pause
+            self._paused = False
+            self.btn_play.setText(tr("pause"))
+            return
+
+        # Start new playback
+        self._playing = True
+        self._paused = False
+        self.btn_play.setText(tr("pause"))
+        self._update_timer.start()
+
+        # Start playback in a thread
+        self._play_thread = threading.Thread(target=self._playback_worker, daemon=True)
+        self._play_thread.start()
+
+    def _playback_worker(self):
+        """Background thread for audio playback."""
+        try:
+            # Calculate starting sample
+            start_sample = int(self._position_ms / 1000 * self._sample_rate)
+            audio_to_play = self._audio_data[start_sample:]
+
+            # Apply volume
+            audio_to_play = audio_to_play * self._volume
+
+            # Track playback position
+            samples_played = 0
+            block_size = 1024
+
+            def callback(outdata, frames, time_info, status):
+                nonlocal samples_played
+
+                if self._paused:
+                    outdata.fill(0)
+                    return
+
+                with self._lock:
+                    current_pos = start_sample + samples_played
+                    end_pos = min(current_pos + frames, len(self._audio_data))
+                    actual_frames = end_pos - current_pos
+
+                    if actual_frames <= 0:
+                        outdata.fill(0)
+                        raise sd.CallbackStop()
+
+                    chunk = self._audio_data[current_pos:end_pos] * self._volume
+
+                    if actual_frames < frames:
+                        outdata[:actual_frames] = chunk
+                        outdata[actual_frames:].fill(0)
+                        samples_played += actual_frames
+                        raise sd.CallbackStop()
+                    else:
+                        outdata[:] = chunk
+                        samples_played += frames
+
+                    # Update position
+                    self._position_ms = int((start_sample + samples_played) / self._sample_rate * 1000)
+
+            with sd.OutputStream(
+                samplerate=self._sample_rate,
+                channels=self._audio_data.shape[1] if len(self._audio_data.shape) > 1 else 1,
+                callback=callback,
+                blocksize=block_size,
+                dtype='float32'
+            ) as stream:
+                while stream.active and self._playing:
+                    sd.sleep(50)
+
+        except Exception as e:
+            # Schedule error log on main thread
+            QTimer.singleShot(0, lambda: self.log_error_signal.emit(f"MediaPlayer: Playback error: {e}"))
+        finally:
+            self._playing = False
+            self._paused = False
+            # Schedule UI update on main thread
+            QTimer.singleShot(0, self._on_playback_finished)
+
+    def _on_playback_finished(self):
+        """Called when playback finishes."""
+        self._update_timer.stop()
+        self.btn_play.setText(tr("play"))
+        if self._position_ms >= self._duration_ms - 100:  # Near end
+            self._position_ms = 0
+            self.progress_slider.setValue(0)
+            self.time_current.setText("0:00")
+
+    def _pause(self):
+        self._paused = True
+        self.btn_play.setText(tr("play"))
+
+    def _stop(self):
+        self._playing = False
+        self._paused = False
+        self._position_ms = 0
+        self._update_timer.stop()
+
+        self.btn_play.setText(tr("play"))
+        self.progress_slider.setValue(0)
+        self.time_current.setText("0:00")
 
     def _on_slider_pressed(self):
         self._seeking = True
 
     def _on_slider_released(self):
         self._seeking = False
-        self._seek(self.progress_slider.value())
+        # Seek to new position
+        new_pos = self.progress_slider.value()
+        was_playing = self._playing and not self._paused
 
-    def _toggle_play(self):
-        if self.player.playbackState() == QMediaPlayer.PlayingState:
-            self.player.pause()
-        else:
-            self.player.play()
+        self._stop()
+        self._position_ms = new_pos
 
-    def _stop(self):
-        self.player.stop()
+        mins, secs = divmod(new_pos // 1000, 60)
+        self.time_current.setText(f"{mins}:{secs:02d}")
+        self.progress_slider.setValue(new_pos)
 
-    def _seek(self, position: int):
-        self.player.setPosition(position)
+        if was_playing:
+            self._play()
 
     def _set_volume(self, value: int):
-        self.audio_output.setVolume(value / 100.0)
+        self._volume = value / 100.0
 
-    def _update_position(self, position: int):
-        if not self._seeking:
-            self.progress_slider.setValue(position)
-        mins, secs = divmod(position // 1000, 60)
-        self.time_current.setText(f"{mins}:{secs:02d}")
-
-    def _update_duration(self, duration: int):
-        self.progress_slider.setRange(0, duration)
-        mins, secs = divmod(duration // 1000, 60)
-        self.time_total.setText(f"{mins}:{secs:02d}")
-
-    def _state_changed(self, state):
-        if state == QMediaPlayer.PlayingState:
-            self.btn_play.setText(tr("pause"))
-        else:
-            self.btn_play.setText(tr("play"))
+    def _update_playback_position(self):
+        """Update UI during playback."""
+        if not self._seeking and self._playing:
+            self.progress_slider.setValue(self._position_ms)
+            mins, secs = divmod(self._position_ms // 1000, 60)
+            self.time_current.setText(f"{mins}:{secs:02d}")

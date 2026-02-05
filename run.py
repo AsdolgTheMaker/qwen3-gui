@@ -304,6 +304,7 @@ def _ensure_deps():
         "PySide6",
         "PySide6-Addons",  # Includes QtMultimedia plugins
         "soundfile",
+        "sounddevice",  # For reliable audio playback
         "librosa",
         "requests",
     ])

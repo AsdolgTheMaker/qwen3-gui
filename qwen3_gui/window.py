@@ -124,6 +124,10 @@ class MainWindow(QMainWindow):
         self.media_player = MediaPlayerWidget()
         self.output_log = OutputLogWidget()
 
+        # Connect media player log signals to output log
+        self.media_player.log_signal.connect(self.output_log.log)
+        self.media_player.log_error_signal.connect(self.output_log.log_error)
+
         # TTS tab (with access to media player and log)
         self.tts_tab = TTSTab(self.media_player, self.output_log)
         self.tabs.addTab(self.tts_tab, tr("tab_tts"))
