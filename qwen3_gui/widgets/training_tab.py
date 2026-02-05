@@ -49,6 +49,7 @@ class TrainingTab(QWidget):
         dataset_layout.addWidget(self.dataset_combo, 0, 1)
 
         refresh_btn = QPushButton(tr("refresh"))
+        refresh_btn.setMaximumWidth(60)
         refresh_btn.clicked.connect(self._refresh_datasets)
         dataset_layout.addWidget(refresh_btn, 0, 2)
 

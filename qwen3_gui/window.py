@@ -73,6 +73,9 @@ class MainWindow(QMainWindow):
         self.training_tab = TrainingTab(self.output_log)
         self.tabs.addTab(self.training_tab, tr("tab_training"))
 
+        # Auto-refresh training datasets when a dataset is saved
+        self.dataset_tab.dataset_saved.connect(self.training_tab._refresh_datasets)
+
         # Settings tab
         self.settings_tab = SettingsTab()
         self.tabs.addTab(self.settings_tab, tr("tab_settings"))

@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
     QLineEdit, QTableWidget, QTableWidgetItem, QHeaderView,
     QFileDialog, QMessageBox, QProgressBar, QComboBox
 )
-from PySide6.QtCore import Qt, QSettings
+from PySide6.QtCore import Qt, QSettings, Signal
 
 from ..constants import DATASETS_DIR, LANGUAGES as TTS_LANGUAGES
 from ..translations import tr
@@ -19,6 +19,8 @@ from ..workers import TranscriptionWorker
 
 class DatasetBuilderTab(QWidget):
     """Interface for building voice training datasets."""
+
+    dataset_saved = Signal()  # Emitted when a dataset is saved
 
     def __init__(self):
         super().__init__()
@@ -400,6 +402,7 @@ class DatasetBuilderTab(QWidget):
                     f.write(f"{dest_audio.name}|{transcript}\n")
 
         QMessageBox.information(self, tr("dataset_saved"), f"{tr('dataset_saved_to')}\n{dataset_path}")
+        self.dataset_saved.emit()
 
     def _clear_all(self):
         reply = QMessageBox.question(
