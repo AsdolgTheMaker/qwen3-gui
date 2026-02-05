@@ -2,6 +2,8 @@
 Background worker threads for Qwen3-TTS GUI.
 """
 
+import os
+from contextlib import contextmanager
 from pathlib import Path
 
 import torch
@@ -12,6 +14,33 @@ from .constants import MODELS, mode_of
 
 # Local cache directory for HuggingFace models (avoids polluting system cache)
 HF_CACHE_DIR = Path(__file__).parent.parent / "hf_models"
+
+
+@contextmanager
+def _hf_cache_override():
+    """Temporarily override HuggingFace cache location during model loading."""
+    HF_CACHE_DIR.mkdir(exist_ok=True)
+    cache_path = str(HF_CACHE_DIR)
+    hub_path = str(HF_CACHE_DIR / "hub")
+
+    # Save original values
+    env_keys = ["HF_HOME", "HF_HUB_CACHE", "HUGGINGFACE_HUB_CACHE", "TRANSFORMERS_CACHE"]
+    original = {k: os.environ.get(k) for k in env_keys}
+
+    try:
+        # Set temporary overrides
+        os.environ["HF_HOME"] = cache_path
+        os.environ["HF_HUB_CACHE"] = hub_path
+        os.environ["HUGGINGFACE_HUB_CACHE"] = hub_path
+        os.environ["TRANSFORMERS_CACHE"] = hub_path
+        yield
+    finally:
+        # Restore original values
+        for k, v in original.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
 
 
 class GenerationWorker(QThread):
@@ -49,27 +78,25 @@ class GenerationWorker(QThread):
                 }
                 dtype = dtype_map.get(self.params["dtype"], torch.bfloat16)
 
-                # Ensure cache directory exists
-                HF_CACHE_DIR.mkdir(exist_ok=True)
-
                 kwargs = {
                     "device_map": self.params["device"],
                     "dtype": dtype,
-                    "cache_dir": str(HF_CACHE_DIR),
                 }
 
                 if self.params.get("flash_attn"):
                     kwargs["attn_implementation"] = "flash_attention_2"
 
-                try:
-                    model = Qwen3TTSModel.from_pretrained(model_id, **kwargs)
-                except Exception:
-                    if "attn_implementation" in kwargs:
-                        self.progress.emit("Flash Attention unavailable, retrying...")
-                        del kwargs["attn_implementation"]
+                # Use context manager to temporarily redirect HF cache during model load
+                with _hf_cache_override():
+                    try:
                         model = Qwen3TTSModel.from_pretrained(model_id, **kwargs)
-                    else:
-                        raise
+                    except Exception:
+                        if "attn_implementation" in kwargs:
+                            self.progress.emit("Flash Attention unavailable, retrying...")
+                            del kwargs["attn_implementation"]
+                            model = Qwen3TTSModel.from_pretrained(model_id, **kwargs)
+                        else:
+                            raise
 
                 self.model_holder["model"] = model
                 self.model_holder["model_id"] = model_id
