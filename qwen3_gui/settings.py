@@ -3,6 +3,7 @@ Application settings management.
 """
 
 import json
+import os
 from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).parent.parent.absolute()
@@ -40,10 +41,22 @@ def set_auto_update_enabled(enabled: bool):
 
 
 def get_hf_cache_path() -> str:
-    """Get custom HuggingFace cache path (empty = use system default)."""
+    """Get HuggingFace cache path from settings."""
     return _load_settings().get("hf_cache_path", "")
 
 
 def set_hf_cache_path(path: str):
-    """Save custom HuggingFace cache path."""
+    """Save HuggingFace cache path."""
     _save_settings({"hf_cache_path": path})
+
+
+def apply_hf_cache_env(path: str):
+    """Apply HuggingFace cache path to environment variables."""
+    if path:
+        p = Path(path)
+        p.mkdir(parents=True, exist_ok=True)
+        hub_path = str(p / "hub")
+        os.environ["HF_HOME"] = path
+        os.environ["HF_HUB_CACHE"] = hub_path
+        os.environ["HUGGINGFACE_HUB_CACHE"] = hub_path
+        os.environ["TRANSFORMERS_CACHE"] = hub_path

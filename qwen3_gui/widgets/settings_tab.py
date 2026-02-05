@@ -2,19 +2,19 @@
 Settings tab for application configuration.
 """
 
+import os
 from pathlib import Path
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QLabel,
     QLineEdit, QPushButton, QFileDialog, QCheckBox, QMessageBox
 )
-from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 
 from ..translations import tr
 from ..settings import (
     get_auto_update_enabled, set_auto_update_enabled,
-    get_hf_cache_path, set_hf_cache_path
+    get_hf_cache_path, set_hf_cache_path, apply_hf_cache_env
 )
 
 
@@ -45,7 +45,6 @@ class SettingsTab(QWidget):
         # Path input
         path_layout = QHBoxLayout()
         self.hf_cache_edit = QLineEdit()
-        self.hf_cache_edit.setPlaceholderText(tr("hf_cache_placeholder"))
         path_layout.addWidget(self.hf_cache_edit)
 
         browse_btn = QPushButton(tr("browse"))
@@ -86,7 +85,12 @@ class SettingsTab(QWidget):
 
     def _load_settings(self):
         """Load current settings into UI."""
-        self.hf_cache_edit.setText(get_hf_cache_path())
+        # Get current HF cache path from env or saved setting
+        hf_path = get_hf_cache_path()
+        if not hf_path:
+            # Show current env var value
+            hf_path = os.environ.get("HF_HOME", "")
+        self.hf_cache_edit.setText(hf_path)
         self.auto_update_check.setChecked(get_auto_update_enabled())
 
     def _browse_hf_cache(self):
@@ -99,8 +103,10 @@ class SettingsTab(QWidget):
             self.hf_cache_edit.setText(path)
 
     def _save_settings(self):
-        """Save settings."""
-        set_hf_cache_path(self.hf_cache_edit.text().strip())
+        """Save settings and apply immediately."""
+        hf_path = self.hf_cache_edit.text().strip()
+        set_hf_cache_path(hf_path)
+        apply_hf_cache_env(hf_path)
         set_auto_update_enabled(self.auto_update_check.isChecked())
 
         QMessageBox.information(

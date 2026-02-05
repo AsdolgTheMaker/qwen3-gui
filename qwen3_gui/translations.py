@@ -860,20 +860,16 @@ How many audio clips the AI looks at simultaneously.<br><br>
         "ru": "Настройки",
     },
     "hf_cache_settings": {
-        "en": "HuggingFace Model Cache",
-        "ru": "Кэш моделей HuggingFace",
+        "en": "HuggingFace Model Cache (HF_HOME)",
+        "ru": "Кэш моделей HuggingFace (HF_HOME)",
     },
     "hf_cache_description": {
-        "en": "Specify a custom directory for downloading and caching AI models. Leave empty to use the system default location.",
-        "ru": "Укажите папку для загрузки и кэширования моделей ИИ. Оставьте пустым для использования системной папки по умолчанию.",
-    },
-    "hf_cache_placeholder": {
-        "en": "Leave empty for system default (e.g., C:\\Users\\...\\huggingface)",
-        "ru": "Оставьте пустым для системного пути (напр., C:\\Users\\...\\huggingface)",
+        "en": "Directory where AI models are downloaded and cached. This sets the HF_HOME environment variable.",
+        "ru": "Папка для загрузки и кэширования моделей ИИ. Устанавливает переменную окружения HF_HOME.",
     },
     "hf_cache_note": {
-        "en": "Changes take effect on next model download. Existing cached models are not moved.",
-        "ru": "Изменения применятся при следующей загрузке модели. Существующие модели не перемещаются.",
+        "en": "Changes apply immediately. Existing cached models are not moved automatically.",
+        "ru": "Изменения применяются сразу. Существующие модели не перемещаются автоматически.",
     },
     "update_settings": {
         "en": "Updates",

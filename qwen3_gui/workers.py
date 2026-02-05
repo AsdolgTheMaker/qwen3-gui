@@ -2,28 +2,12 @@
 Background worker threads for Qwen3-TTS GUI.
 """
 
-import os
-from pathlib import Path
-
 import torch
 import soundfile as sf
 from PySide6.QtCore import QThread, Signal
 
 from .constants import MODELS, mode_of
-from .settings import get_hf_cache_path
-
-
-def _apply_hf_cache_setting():
-    """Apply HuggingFace cache path from settings."""
-    cache_path = get_hf_cache_path()
-    if cache_path:
-        path = Path(cache_path)
-        path.mkdir(parents=True, exist_ok=True)
-        hub_path = str(path / "hub")
-        os.environ["HF_HOME"] = str(path)
-        os.environ["HF_HUB_CACHE"] = hub_path
-        os.environ["HUGGINGFACE_HUB_CACHE"] = hub_path
-        os.environ["TRANSFORMERS_CACHE"] = hub_path
+from .settings import get_hf_cache_path, apply_hf_cache_env
 
 
 class GenerationWorker(QThread):
@@ -55,7 +39,7 @@ class GenerationWorker(QThread):
                 self.progress.emit(f"Loading {model_label}...")
 
                 # Apply HF cache setting before loading
-                _apply_hf_cache_setting()
+                apply_hf_cache_env(get_hf_cache_path())
 
                 dtype_map = {
                     "bfloat16": torch.bfloat16,
