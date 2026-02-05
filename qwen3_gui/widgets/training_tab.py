@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QComboBox, QLineEdit, QTextEdit, QProgressBar, QGroupBox, QSpinBox,
     QDoubleSpinBox, QMessageBox
 )
+from PySide6.QtCore import QSettings
 from PySide6.QtGui import QFont
 
 from ..constants import DATASETS_DIR
@@ -23,7 +24,9 @@ class TrainingTab(QWidget):
     def __init__(self, output_log: OutputLogWidget = None):
         super().__init__()
         self.output_log = output_log
+        self._settings = QSettings("AsdolgTheMaker", "Qwen3TTS")
         self._setup_ui()
+        self._restore_state()
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -192,3 +195,34 @@ class TrainingTab(QWidget):
         # 2. Setting up the training loop
         # 3. Fine-tuning the model
         # 4. Saving checkpoints
+
+    def _save_state(self):
+        """Save widget state to settings."""
+        s = self._settings
+        s.beginGroup("training")
+        s.setValue("base_model", self.base_model_combo.currentIndex())
+        s.setValue("epochs", self.epochs_spin.value())
+        s.setValue("learning_rate", self.lr_spin.value())
+        s.setValue("batch_size", self.batch_spin.value())
+        s.setValue("model_name", self.model_name_edit.text())
+        s.endGroup()
+
+    def _restore_state(self):
+        """Restore widget state from settings."""
+        s = self._settings
+        s.beginGroup("training")
+
+        idx = s.value("base_model", 0, type=int)
+        if 0 <= idx < self.base_model_combo.count():
+            self.base_model_combo.setCurrentIndex(idx)
+
+        self.epochs_spin.setValue(s.value("epochs", 10, type=int))
+        self.lr_spin.setValue(s.value("learning_rate", 0.0001, type=float))
+        self.batch_spin.setValue(s.value("batch_size", 4, type=int))
+        self.model_name_edit.setText(s.value("model_name", "", type=str))
+        s.endGroup()
+
+    def hideEvent(self, event):
+        """Save state when tab is hidden."""
+        self._save_state()
+        super().hideEvent(event)

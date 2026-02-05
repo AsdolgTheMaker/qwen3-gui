@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
     QComboBox, QTextEdit, QLineEdit, QCheckBox, QProgressBar, QGroupBox,
     QFileDialog, QMessageBox, QSpinBox, QDoubleSpinBox, QScrollArea
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSettings
 
 from ..constants import (
     MODELS, SPEAKERS, SPEAKER_INFO, LANGUAGES as TTS_LANGUAGES, DTYPE_OPTIONS,
@@ -34,7 +34,9 @@ class TTSTab(QWidget):
         self.model_holder = {"model": None, "model_id": None}
         self.worker = None
         self._device = "cuda:0" if torch.cuda.is_available() else "cpu"
+        self._settings = QSettings("AsdolgTheMaker", "Qwen3TTS")
         self._setup_ui()
+        self._restore_state()
 
     def _setup_ui(self):
         layout = QHBoxLayout(self)
@@ -432,3 +434,64 @@ class TTSTab(QWidget):
             self.media_player.load_file(output_path)
         elif not success:
             self._log("log_error", message)
+
+    def _save_state(self):
+        """Save widget state to settings."""
+        s = self._settings
+        s.beginGroup("tts")
+        s.setValue("model", self.model_combo.currentIndex())
+        s.setValue("language", self.lang_combo.currentIndex())
+        s.setValue("speaker", self.speaker_combo.currentIndex())
+        s.setValue("instruction", self.instruct_edit.toPlainText())
+        s.setValue("ref_audio", self.ref_path_edit.text())
+        s.setValue("xvector", self.xvector_check.isChecked())
+        s.setValue("temperature", self.temp_spin.value())
+        s.setValue("top_k", self.topk_spin.value())
+        s.setValue("top_p", self.topp_spin.value())
+        s.setValue("rep_penalty", self.rep_spin.value())
+        s.setValue("max_tokens", self.maxtok_spin.value())
+        s.setValue("dtype", self.dtype_combo.currentIndex())
+        s.setValue("flash_attn", self.flash_check.isChecked())
+        s.endGroup()
+
+    def _restore_state(self):
+        """Restore widget state from settings."""
+        s = self._settings
+        s.beginGroup("tts")
+
+        idx = s.value("model", 0, type=int)
+        if 0 <= idx < self.model_combo.count():
+            self.model_combo.setCurrentIndex(idx)
+
+        idx = s.value("language", 0, type=int)
+        if 0 <= idx < self.lang_combo.count():
+            self.lang_combo.setCurrentIndex(idx)
+
+        idx = s.value("speaker", 0, type=int)
+        if 0 <= idx < self.speaker_combo.count():
+            self.speaker_combo.setCurrentIndex(idx)
+
+        self.instruct_edit.setPlainText(s.value("instruction", "", type=str))
+        self.ref_path_edit.setText(s.value("ref_audio", "", type=str))
+        self.xvector_check.setChecked(s.value("xvector", False, type=bool))
+        self.temp_spin.setValue(s.value("temperature", 0.9, type=float))
+        self.topk_spin.setValue(s.value("top_k", 50, type=int))
+        self.topp_spin.setValue(s.value("top_p", 1.0, type=float))
+        self.rep_spin.setValue(s.value("rep_penalty", 1.05, type=float))
+        self.maxtok_spin.setValue(s.value("max_tokens", 2048, type=int))
+
+        idx = s.value("dtype", 0, type=int)
+        if 0 <= idx < self.dtype_combo.count():
+            self.dtype_combo.setCurrentIndex(idx)
+
+        self.flash_check.setChecked(s.value("flash_attn", True, type=bool))
+        s.endGroup()
+
+    def showEvent(self, event):
+        """Called when widget is shown."""
+        super().showEvent(event)
+
+    def hideEvent(self, event):
+        """Save state when tab is hidden."""
+        self._save_state()
+        super().hideEvent(event)

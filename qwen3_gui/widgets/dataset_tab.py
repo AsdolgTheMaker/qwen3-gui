@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
     QLineEdit, QTableWidget, QTableWidgetItem, QHeaderView,
     QFileDialog, QMessageBox
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSettings
 
 from ..constants import DATASETS_DIR
 from ..translations import tr
@@ -22,7 +22,9 @@ class DatasetBuilderTab(QWidget):
     def __init__(self):
         super().__init__()
         self.dataset_entries = []
+        self._settings = QSettings("AsdolgTheMaker", "Qwen3TTS")
         self._setup_ui()
+        self._restore_state()
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -239,3 +241,22 @@ class DatasetBuilderTab(QWidget):
         if reply == QMessageBox.Yes:
             self.table.setRowCount(0)
             self._update_info()
+
+    def _save_state(self):
+        """Save widget state to settings."""
+        s = self._settings
+        s.beginGroup("dataset")
+        s.setValue("dataset_name", self.dataset_name_edit.text())
+        s.endGroup()
+
+    def _restore_state(self):
+        """Restore widget state from settings."""
+        s = self._settings
+        s.beginGroup("dataset")
+        self.dataset_name_edit.setText(s.value("dataset_name", "", type=str))
+        s.endGroup()
+
+    def hideEvent(self, event):
+        """Save state when tab is hidden."""
+        self._save_state()
+        super().hideEvent(event)
