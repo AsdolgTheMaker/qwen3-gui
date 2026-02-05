@@ -28,46 +28,55 @@ def redirect_hf_progress(callback):
     Args:
         callback: Function that takes a message string
     """
+    original_tqdm = None
+    tqdm_module = None
+
     try:
-        from huggingface_hub import utils as hf_utils
+        import sys
+
+        # Get the actual tqdm module from sys.modules
+        tqdm_module = sys.modules.get('huggingface_hub.utils.tqdm')
+        if tqdm_module is None:
+            # Import it to ensure it's loaded
+            import huggingface_hub.utils.tqdm
+            tqdm_module = sys.modules['huggingface_hub.utils.tqdm']
 
         # Store original tqdm class
-        original_tqdm = hf_utils.tqdm.tqdm
+        original_tqdm = tqdm_module.tqdm
 
         # Create a custom tqdm that reports to our callback
         class CallbackTqdm(original_tqdm):
             def __init__(self, *args, **kwargs):
                 # Extract description for our messages
-                self._desc = kwargs.get('desc', '')
+                self._cb_desc = kwargs.get('desc', '')
                 super().__init__(*args, **kwargs)
 
             def update(self, n=1):
                 super().update(n)
-                if self.total:
+                if self.total and self.total > 0:
                     pct = 100 * self.n / self.total
                     size_info = f"{_format_size(self.n)}/{_format_size(self.total)}"
-                    msg = f"Downloading {self._desc}: {pct:.0f}% ({size_info})"
+                    msg = f"Downloading {self._cb_desc}: {pct:.0f}% ({size_info})"
                     callback(msg)
 
             def close(self):
                 if self.total and self.n >= self.total:
-                    callback(f"Downloaded {self._desc}: {_format_size(self.total)}")
+                    callback(f"Downloaded {self._cb_desc}: {_format_size(self.total)}")
                 super().close()
 
-        # Monkey-patch
-        hf_utils.tqdm.tqdm = CallbackTqdm
+        # Monkey-patch the module
+        tqdm_module.tqdm = CallbackTqdm
 
         yield
 
-    except ImportError:
-        # huggingface_hub not available, just yield
+    except Exception:
+        # If anything fails, just yield without patching
         yield
+
     finally:
         # Restore original if we patched it
-        try:
-            hf_utils.tqdm.tqdm = original_tqdm
-        except (NameError, UnboundLocalError):
-            pass
+        if original_tqdm is not None and tqdm_module is not None:
+            tqdm_module.tqdm = original_tqdm
 
 
 class GenerationWorker(QThread):
