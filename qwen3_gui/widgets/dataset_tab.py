@@ -259,23 +259,57 @@ class DatasetBuilderTab(QWidget):
             self._start_transcription([(row, audio_path)])
 
     def _transcribe_all(self):
-        """Transcribe all rows that don't have transcripts."""
-        files_to_transcribe = []
-        for row in range(self.table.rowCount()):
-            transcript_item = self.table.item(row, 2)
-            # Skip rows that already have transcripts
-            if transcript_item and transcript_item.text().strip():
-                continue
-            audio_item = self.table.item(row, 0)
-            if audio_item:
-                audio_path = audio_item.data(Qt.UserRole)
-                files_to_transcribe.append((row, audio_path))
-
-        if not files_to_transcribe:
-            QMessageBox.information(self, tr("transcribe"), tr("transcribe_nothing"))
+        """Transcribe all rows, with smart prompting based on existing transcripts."""
+        total_rows = self.table.rowCount()
+        if total_rows == 0:
             return
 
-        self._start_transcription(files_to_transcribe)
+        # Collect all files and count which have transcripts
+        all_files = []
+        empty_files = []
+        for row in range(total_rows):
+            audio_item = self.table.item(row, 0)
+            if not audio_item:
+                continue
+            audio_path = audio_item.data(Qt.UserRole)
+            all_files.append((row, audio_path))
+
+            transcript_item = self.table.item(row, 2)
+            if not transcript_item or not transcript_item.text().strip():
+                empty_files.append((row, audio_path))
+
+        if not all_files:
+            return
+
+        has_transcripts = len(all_files) - len(empty_files)
+
+        if has_transcripts == 0:
+            # None have transcripts - just start
+            self._start_transcription(all_files)
+        elif len(empty_files) == 0:
+            # All have transcripts - ask to override
+            reply = QMessageBox.question(
+                self, tr("transcribe"),
+                tr("transcribe_all_override_confirm"),
+                QMessageBox.Yes | QMessageBox.No
+            )
+            if reply == QMessageBox.Yes:
+                self._start_transcription(all_files)
+        else:
+            # Some have transcripts - offer choices
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle(tr("transcribe"))
+            msg_box.setText(tr("transcribe_some_exist", filled=has_transcripts, empty=len(empty_files)))
+            override_btn = msg_box.addButton(tr("transcribe_override_all"), QMessageBox.YesRole)
+            empty_btn = msg_box.addButton(tr("transcribe_empty_only"), QMessageBox.NoRole)
+            msg_box.addButton(QMessageBox.Cancel)
+            msg_box.exec()
+
+            clicked = msg_box.clickedButton()
+            if clicked == override_btn:
+                self._start_transcription(all_files)
+            elif clicked == empty_btn:
+                self._start_transcription(empty_files)
 
     def _start_transcription(self, files: list):
         """Start transcription worker."""

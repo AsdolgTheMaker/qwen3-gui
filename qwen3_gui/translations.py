@@ -382,6 +382,22 @@ _TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "en": "Transcription is already in progress.",
         "ru": "Транскрибирование уже выполняется.",
     },
+    "transcribe_all_override_confirm": {
+        "en": "All files already have transcripts. Override all?",
+        "ru": "Все файлы уже имеют транскрипты. Перезаписать все?",
+    },
+    "transcribe_some_exist": {
+        "en": "{filled} files have transcripts, {empty} are empty.",
+        "ru": "{filled} файлов имеют транскрипты, {empty} пустых.",
+    },
+    "transcribe_override_all": {
+        "en": "Override All",
+        "ru": "Перезаписать все",
+    },
+    "transcribe_empty_only": {
+        "en": "Fill Empty Only",
+        "ru": "Только пустые",
+    },
     "delete": {
         "en": "Delete",
         "ru": "Удалить",
