@@ -4,7 +4,7 @@ Qwen3-TTS GUI Package
 Modern PySide6-based interface for Qwen3 Text-to-Speech.
 """
 
-__version__ = "1.5.24"
+__version__ = "1.5.25"
 __author__ = "AsdolgTheMaker"
 
 from .main import main

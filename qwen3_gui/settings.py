@@ -52,7 +52,7 @@ def set_hf_cache_path(path: str):
 
 def get_whisper_model() -> str:
     """Get Whisper model ID from settings."""
-    return _load_settings().get("whisper_model", "openai/whisper-base")
+    return _load_settings().get("whisper_model", "openai/whisper-small")
 
 
 def set_whisper_model(model_id: str):
