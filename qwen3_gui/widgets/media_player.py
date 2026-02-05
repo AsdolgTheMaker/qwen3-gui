@@ -21,6 +21,7 @@ class MediaPlayerWidget(QFrame):
         super().__init__()
         self.setFrameStyle(QFrame.StyledPanel | QFrame.Sunken)
         self._current_file = None
+        self._file_duration_ms = 0
         self._setup_ui()
 
     def _setup_ui(self):
@@ -88,15 +89,56 @@ class MediaPlayerWidget(QFrame):
         self.player.positionChanged.connect(self._update_position)
         self.player.durationChanged.connect(self._update_duration)
         self.player.playbackStateChanged.connect(self._state_changed)
+        self.player.mediaStatusChanged.connect(self._on_media_status)
+
+        # Track if we're seeking to prevent slider jumps
+        self._seeking = False
+        self.progress_slider.sliderPressed.connect(self._on_slider_pressed)
+        self.progress_slider.sliderReleased.connect(self._on_slider_released)
 
     def load_file(self, path: str):
         """Load an audio file for playback."""
         self._current_file = path
         self.file_label.setText(Path(path).name)
+
+        # Get duration from soundfile first (more reliable for WAV)
+        self._file_duration_ms = self._get_file_duration(path)
+
         self.player.setSource(QUrl.fromLocalFile(path))
         self.btn_play.setEnabled(True)
         self.btn_stop.setEnabled(True)
         self.progress_slider.setEnabled(True)
+
+        # Set duration immediately if we have it from soundfile
+        if self._file_duration_ms > 0:
+            self._update_duration(self._file_duration_ms)
+
+    def _get_file_duration(self, path: str) -> int:
+        """Get file duration in milliseconds using soundfile."""
+        try:
+            import soundfile as sf
+            info = sf.info(path)
+            return int(info.duration * 1000)
+        except Exception:
+            return 0
+
+    def _on_media_status(self, status):
+        """Handle media status changes to get accurate duration."""
+        if status == QMediaPlayer.LoadedMedia:
+            # Use soundfile duration if available, otherwise Qt's
+            if self._file_duration_ms > 0:
+                self._update_duration(self._file_duration_ms)
+            else:
+                duration = self.player.duration()
+                if duration > 0:
+                    self._update_duration(duration)
+
+    def _on_slider_pressed(self):
+        self._seeking = True
+
+    def _on_slider_released(self):
+        self._seeking = False
+        self._seek(self.progress_slider.value())
 
     def _toggle_play(self):
         if self.player.playbackState() == QMediaPlayer.PlayingState:
@@ -114,7 +156,8 @@ class MediaPlayerWidget(QFrame):
         self.audio_output.setVolume(value / 100.0)
 
     def _update_position(self, position: int):
-        self.progress_slider.setValue(position)
+        if not self._seeking:
+            self.progress_slider.setValue(position)
         mins, secs = divmod(position // 1000, 60)
         self.time_current.setText(f"{mins}:{secs:02d}")
 
