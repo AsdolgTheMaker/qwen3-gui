@@ -300,9 +300,9 @@ def _ensure_venv():
 
 def _ensure_deps():
     """Install dependencies if not already installed."""
-    # Check if PySide6 is installed (our main GUI dependency)
+    # Check if all critical dependencies are installed
     result = subprocess.run(
-        [str(VENV_PYTHON), "-c", "import PySide6; import qwen_tts"],
+        [str(VENV_PYTHON), "-c", "import PySide6; import qwen_tts; import sounddevice"],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     )
     if result.returncode == 0:
@@ -361,11 +361,12 @@ def bootstrap(skip_update: bool = False, force_update: bool = False):
         try:
             import PySide6  # noqa: F401
             import qwen_tts  # noqa: F401
+            import sounddevice  # noqa: F401
         except ImportError:
             print("[setup] Missing dependencies, installing ...")
             subprocess.check_call([
                 str(VENV_PIP), "install",
-                "qwen-tts", "PySide6", "soundfile", "librosa", "requests"
+                "qwen-tts", "PySide6", "soundfile", "sounddevice", "librosa", "requests"
             ])
         return
 

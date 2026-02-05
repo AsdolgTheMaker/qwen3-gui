@@ -98,6 +98,7 @@ class MainWindow(QMainWindow):
 
         # Shared widgets
         self.media_player = MediaPlayerWidget()
+        self.media_player.hide()  # Hidden until audio is generated
         self.output_log = OutputLogWidget()
 
         # Connect media player log signals to output log

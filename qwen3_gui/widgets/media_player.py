@@ -21,8 +21,10 @@ from ..translations import tr
 try:
     import sounddevice as sd
     HAS_SOUNDDEVICE = True
-except ImportError:
+    SOUNDDEVICE_ERROR = None
+except Exception as e:
     HAS_SOUNDDEVICE = False
+    SOUNDDEVICE_ERROR = str(e)
 
 
 class MediaPlayerWidget(QFrame):
@@ -143,6 +145,9 @@ class MediaPlayerWidget(QFrame):
             self.btn_stop.setEnabled(True)
             self.progress_slider.setEnabled(True)
 
+            # Show the player (it starts hidden)
+            self.show()
+
             # Log success
             self.log_signal.emit(f"MediaPlayer: Loaded {Path(path).name} ({mins}:{secs:02d}, {self._sample_rate}Hz)")
 
@@ -158,6 +163,8 @@ class MediaPlayerWidget(QFrame):
 
     def _play(self):
         if not HAS_SOUNDDEVICE or self._audio_data is None:
+            if not HAS_SOUNDDEVICE:
+                self.log_error_signal.emit(f"Audio playback unavailable: {SOUNDDEVICE_ERROR}")
             return
 
         if self._paused:

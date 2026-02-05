@@ -328,7 +328,10 @@ class TTSTab(QWidget):
         left_layout.addWidget(self.progress_bar)
 
         self.status_label = QLabel(f"{tr('ready_device')} {self._device}")
-        self.status_label.setStyleSheet("color: #666;")
+        self.status_label.setStyleSheet("color: #444;")
+        self.status_label.setWordWrap(False)
+        # Prevent long status messages from expanding the window
+        self.status_label.setMaximumWidth(500)
         left_layout.addWidget(self.status_label)
 
         layout.addWidget(left_panel, stretch=2)
@@ -474,21 +477,27 @@ class TTSTab(QWidget):
         self.worker.finished.connect(self._on_finished)
         self.worker.start()
 
+    def _set_status(self, message: str, max_len: int = 80):
+        """Set status label text, truncating if too long."""
+        if len(message) > max_len:
+            message = message[:max_len - 3] + "..."
+        self.status_label.setText(message)
+
     def _on_cancel(self):
         if self.worker:
             self.worker.cancel()
-            self.status_label.setText(tr("cancelling"))
+            self._set_status(tr("cancelling"))
             self._log("log_warning", "Generation cancelled by user")
 
     def _on_progress(self, message: str):
-        self.status_label.setText(message)
+        self._set_status(message)
         self._log("log_progress", message)
 
     def _on_finished(self, success: bool, message: str, output_path: str):
         self.generate_btn.setEnabled(True)
         self.cancel_btn.setEnabled(False)
         self.progress_bar.hide()
-        self.status_label.setText(message)
+        self._set_status(message)
 
         if success and output_path:
             self._log("log_success", f"Generation complete!")
