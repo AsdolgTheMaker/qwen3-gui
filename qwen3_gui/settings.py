@@ -55,8 +55,5 @@ def apply_hf_cache_env(path: str):
     if path:
         p = Path(path)
         p.mkdir(parents=True, exist_ok=True)
-        hub_path = str(p / "hub")
+        # HF_HOME is the main variable - others derive from it
         os.environ["HF_HOME"] = path
-        os.environ["HF_HUB_CACHE"] = hub_path
-        os.environ["HUGGINGFACE_HUB_CACHE"] = hub_path
-        os.environ["TRANSFORMERS_CACHE"] = hub_path
