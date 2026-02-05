@@ -8,12 +8,13 @@ from pathlib import Path
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QTableWidget, QTableWidgetItem, QHeaderView,
-    QFileDialog, QMessageBox
+    QFileDialog, QMessageBox, QProgressBar
 )
 from PySide6.QtCore import Qt, QSettings
 
 from ..constants import DATASETS_DIR
 from ..translations import tr
+from ..workers import TranscriptionWorker
 
 
 class DatasetBuilderTab(QWidget):
@@ -23,6 +24,7 @@ class DatasetBuilderTab(QWidget):
         super().__init__()
         self.dataset_entries = []
         self._settings = QSettings("AsdolgTheMaker", "Qwen3TTS")
+        self._transcription_worker = None
         self._setup_ui()
         self._restore_state()
 
@@ -53,7 +55,18 @@ class DatasetBuilderTab(QWidget):
         import_layout.addWidget(import_folder_btn)
 
         import_layout.addStretch()
+
+        self.transcribe_all_btn = QPushButton(tr("transcribe_all"))
+        self.transcribe_all_btn.clicked.connect(self._transcribe_all)
+        import_layout.addWidget(self.transcribe_all_btn)
+
         layout.addLayout(import_layout)
+
+        # Transcription progress bar (hidden by default)
+        self.transcribe_progress = QProgressBar()
+        self.transcribe_progress.setTextVisible(True)
+        self.transcribe_progress.hide()
+        layout.addWidget(self.transcribe_progress)
 
         # Dataset table
         self.table = QTableWidget()
@@ -148,15 +161,24 @@ class DatasetBuilderTab(QWidget):
         # Actions
         actions_widget = QWidget()
         actions_layout = QHBoxLayout(actions_widget)
-        actions_layout.setContentsMargins(4, 0, 4, 0)
+        actions_layout.setContentsMargins(2, 0, 2, 0)
+        actions_layout.setSpacing(2)
 
-        play_btn = QPushButton(tr("play"))
-        play_btn.setMaximumWidth(50)
+        play_btn = QPushButton("▶")
+        play_btn.setMaximumWidth(28)
+        play_btn.setToolTip(tr("play"))
         play_btn.clicked.connect(lambda checked, r=row: self._play_row(r))
         actions_layout.addWidget(play_btn)
 
-        del_btn = QPushButton("X")
-        del_btn.setMaximumWidth(30)
+        transcribe_btn = QPushButton("T")
+        transcribe_btn.setMaximumWidth(28)
+        transcribe_btn.setToolTip(tr("transcribe"))
+        transcribe_btn.clicked.connect(lambda checked, r=row: self._transcribe_row(r))
+        actions_layout.addWidget(transcribe_btn)
+
+        del_btn = QPushButton("✕")
+        del_btn.setMaximumWidth(28)
+        del_btn.setToolTip(tr("delete"))
         del_btn.clicked.connect(lambda checked, r=row: self._delete_row(r))
         actions_layout.addWidget(del_btn)
 
@@ -195,6 +217,80 @@ class DatasetBuilderTab(QWidget):
     def _delete_row(self, row: int):
         self.table.removeRow(row)
         self._update_info()
+
+    def _transcribe_row(self, row: int):
+        """Transcribe a single row."""
+        # Check if transcript already exists
+        transcript_item = self.table.item(row, 2)
+        if transcript_item and transcript_item.text().strip():
+            reply = QMessageBox.question(
+                self, tr("transcribe"),
+                tr("transcribe_overwrite_confirm"),
+                QMessageBox.Yes | QMessageBox.No
+            )
+            if reply != QMessageBox.Yes:
+                return
+
+        audio_item = self.table.item(row, 0)
+        if audio_item:
+            audio_path = audio_item.data(Qt.UserRole)
+            self._start_transcription([(row, audio_path)])
+
+    def _transcribe_all(self):
+        """Transcribe all rows that don't have transcripts."""
+        files_to_transcribe = []
+        for row in range(self.table.rowCount()):
+            transcript_item = self.table.item(row, 2)
+            # Skip rows that already have transcripts
+            if transcript_item and transcript_item.text().strip():
+                continue
+            audio_item = self.table.item(row, 0)
+            if audio_item:
+                audio_path = audio_item.data(Qt.UserRole)
+                files_to_transcribe.append((row, audio_path))
+
+        if not files_to_transcribe:
+            QMessageBox.information(self, tr("transcribe"), tr("transcribe_nothing"))
+            return
+
+        self._start_transcription(files_to_transcribe)
+
+    def _start_transcription(self, files: list):
+        """Start transcription worker."""
+        if self._transcription_worker and self._transcription_worker.isRunning():
+            QMessageBox.warning(self, tr("transcribe"), tr("transcribe_in_progress"))
+            return
+
+        self.transcribe_progress.setRange(0, len(files))
+        self.transcribe_progress.setValue(0)
+        self.transcribe_progress.setFormat(tr("transcribing") + " %v/%m")
+        self.transcribe_progress.show()
+        self.transcribe_all_btn.setEnabled(False)
+
+        self._transcription_worker = TranscriptionWorker(files)
+        self._transcription_worker.progress.connect(self._on_transcribe_progress)
+        self._transcription_worker.result.connect(self._on_transcribe_result)
+        self._transcription_worker.finished.connect(self._on_transcribe_finished)
+        self._transcription_worker.start()
+
+    def _on_transcribe_progress(self, message: str):
+        """Handle transcription progress."""
+        self.transcribe_progress.setFormat(message)
+
+    def _on_transcribe_result(self, row: int, transcription: str):
+        """Handle transcription result for a row."""
+        # Update the transcript cell
+        transcript_item = self.table.item(row, 2)
+        if transcript_item:
+            transcript_item.setText(transcription)
+        self.transcribe_progress.setValue(self.transcribe_progress.value() + 1)
+
+    def _on_transcribe_finished(self, success: bool, message: str):
+        """Handle transcription completion."""
+        self.transcribe_progress.hide()
+        self.transcribe_all_btn.setEnabled(True)
+        if not success and message != "Cancelled":
+            QMessageBox.warning(self, tr("transcribe"), message)
 
     def _update_info(self):
         count = self.table.rowCount()

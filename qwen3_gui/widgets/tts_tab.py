@@ -20,7 +20,7 @@ from ..constants import (
 )
 from ..tooltips import set_tooltip
 from ..translations import tr
-from ..workers import GenerationWorker
+from ..workers import GenerationWorker, TranscriptionWorker
 from .media_player import MediaPlayerWidget
 from .output_log import OutputLogWidget
 
@@ -33,6 +33,7 @@ class TTSTab(QWidget):
         self.media_player = media_player
         self.output_log = output_log
         self.model_holder = {"model": None, "model_id": None}
+        self._ref_transcription_worker = None
         self.worker = None
         self._device = "cuda:0" if torch.cuda.is_available() else "cpu"
         self._settings = QSettings("AsdolgTheMaker", "Qwen3TTS")
@@ -158,9 +159,16 @@ class TTSTab(QWidget):
 
         ref_layout.addLayout(ref_file_layout)
 
+        ref_text_header = QHBoxLayout()
         ref_text_label = QLabel(tr("reference_transcript"))
         set_tooltip(ref_text_label, "ref_text")
-        ref_layout.addWidget(ref_text_label)
+        ref_text_header.addWidget(ref_text_label)
+        ref_text_header.addStretch()
+        self.ref_transcribe_btn = QPushButton(tr("transcribe"))
+        self.ref_transcribe_btn.setMaximumWidth(100)
+        self.ref_transcribe_btn.clicked.connect(self._transcribe_ref_audio)
+        ref_text_header.addWidget(self.ref_transcribe_btn)
+        ref_layout.addLayout(ref_text_header)
 
         self.ref_text_edit = QTextEdit()
         self.ref_text_edit.setPlaceholderText(tr("ref_transcript_placeholder"))
@@ -376,6 +384,51 @@ class TTSTab(QWidget):
         )
         if path:
             self.ref_path_edit.setText(path)
+
+    def _transcribe_ref_audio(self):
+        """Transcribe the reference audio file."""
+        ref_path = self.ref_path_edit.text().strip()
+        if not ref_path:
+            QMessageBox.warning(self, tr("transcribe"), tr("error_no_ref_audio"))
+            return
+
+        # Check if transcript already exists
+        if self.ref_text_edit.toPlainText().strip():
+            reply = QMessageBox.question(
+                self, tr("transcribe"),
+                tr("transcribe_overwrite_confirm"),
+                QMessageBox.Yes | QMessageBox.No
+            )
+            if reply != QMessageBox.Yes:
+                return
+
+        # Disable button during transcription
+        self.ref_transcribe_btn.setEnabled(False)
+        self.ref_transcribe_btn.setText(tr("transcribing"))
+
+        # Get language hint
+        lang = self.lang_combo.currentText()
+
+        self._ref_transcription_worker = TranscriptionWorker([(0, ref_path)], language=lang)
+        self._ref_transcription_worker.progress.connect(lambda msg: self._set_status(msg))
+        self._ref_transcription_worker.result.connect(self._on_ref_transcription_result)
+        self._ref_transcription_worker.finished.connect(self._on_ref_transcription_finished)
+        self._ref_transcription_worker.start()
+
+    def _on_ref_transcription_result(self, row: int, transcription: str):
+        """Handle reference transcription result."""
+        self.ref_text_edit.setPlainText(transcription)
+
+    def _on_ref_transcription_finished(self, success: bool, message: str):
+        """Handle reference transcription completion."""
+        self.ref_transcribe_btn.setEnabled(True)
+        self.ref_transcribe_btn.setText(tr("transcribe"))
+        if success:
+            self._set_status(f"{tr('ready_device')} {self._device}")
+        else:
+            self._set_status(message)
+            if message != "Cancelled":
+                QMessageBox.warning(self, tr("transcribe"), message)
 
     def _browse_output(self):
         path, _ = QFileDialog.getSaveFileName(

@@ -157,3 +157,104 @@ class TrainingWorker(QThread):
         self.log.emit("Training implementation is a placeholder.")
         self.log.emit("See qwen-tts documentation for training instructions.")
         self.finished.emit(False, "Training not yet implemented")
+
+
+class TranscriptionWorker(QThread):
+    """Worker thread for audio transcription using Whisper."""
+
+    progress = Signal(str)
+    result = Signal(int, str)  # row_index, transcription
+    finished = Signal(bool, str)  # success, message
+
+    # Shared model holder to avoid reloading
+    _model_holder = {"model": None, "processor": None}
+
+    def __init__(self, audio_files: list, language: str = None):
+        """
+        Args:
+            audio_files: List of (row_index, audio_path) tuples
+            language: Optional language hint
+        """
+        super().__init__()
+        self.audio_files = audio_files
+        self.language = language
+        self._cancelled = False
+
+    def cancel(self):
+        """Request cancellation."""
+        self._cancelled = True
+
+    def run(self):
+        try:
+            import librosa
+
+            # Lazy load model
+            if self._model_holder["model"] is None:
+                self.progress.emit("Loading Whisper model...")
+                from transformers import WhisperProcessor, WhisperForConditionalGeneration
+
+                model_id = "openai/whisper-base"
+                self._model_holder["processor"] = WhisperProcessor.from_pretrained(model_id)
+                self._model_holder["model"] = WhisperForConditionalGeneration.from_pretrained(model_id)
+
+                if torch.cuda.is_available():
+                    self._model_holder["model"] = self._model_holder["model"].to("cuda")
+
+            model = self._model_holder["model"]
+            processor = self._model_holder["processor"]
+
+            # Language mapping
+            lang_map = {
+                "chinese": "zh", "english": "en", "japanese": "ja", "korean": "ko",
+                "german": "de", "french": "fr", "russian": "ru", "portuguese": "pt",
+                "spanish": "es", "italian": "it", "auto": None
+            }
+            lang_code = None
+            if self.language:
+                lang_code = lang_map.get(self.language.lower(), self.language.lower() if len(self.language) <= 3 else None)
+
+            total = len(self.audio_files)
+            for i, (row_idx, audio_path) in enumerate(self.audio_files):
+                if self._cancelled:
+                    self.finished.emit(False, "Cancelled")
+                    return
+
+                self.progress.emit(f"Transcribing {i+1}/{total}: {audio_path.split('/')[-1].split(chr(92))[-1]}")
+
+                try:
+                    # Load audio
+                    audio, sr = librosa.load(audio_path, sr=16000)
+
+                    # Process
+                    inputs = processor(audio, sampling_rate=16000, return_tensors="pt")
+                    input_features = inputs["input_features"]
+
+                    # Create attention mask (all 1s, same batch size and sequence length)
+                    attention_mask = torch.ones(
+                        input_features.shape[0],
+                        input_features.shape[-1],
+                        dtype=torch.long
+                    )
+
+                    if torch.cuda.is_available():
+                        input_features = input_features.to("cuda")
+                        attention_mask = attention_mask.to("cuda")
+
+                    # Generate
+                    generate_kwargs = {"attention_mask": attention_mask}
+                    if lang_code:
+                        generate_kwargs["language"] = lang_code
+
+                    with torch.no_grad():
+                        generated_ids = model.generate(input_features, **generate_kwargs)
+
+                    transcription = processor.batch_decode(generated_ids, skip_special_tokens=True)[0].strip()
+                    self.result.emit(row_idx, transcription)
+
+                except Exception as e:
+                    self.progress.emit(f"Error transcribing row {row_idx}: {e}")
+
+            self.finished.emit(True, f"Transcribed {total} files")
+
+        except Exception as e:
+            self.finished.emit(False, str(e))

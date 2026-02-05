@@ -358,6 +358,34 @@ _TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "en": "Import Error",
         "ru": "Ошибка импорта",
     },
+    "transcribe": {
+        "en": "Transcribe",
+        "ru": "Транскрибировать",
+    },
+    "transcribe_all": {
+        "en": "Transcribe All",
+        "ru": "Транскрибировать все",
+    },
+    "transcribing": {
+        "en": "Transcribing...",
+        "ru": "Транскрибирование...",
+    },
+    "transcribe_overwrite_confirm": {
+        "en": "This entry already has a transcript. Overwrite it?",
+        "ru": "Эта запись уже имеет транскрипт. Перезаписать?",
+    },
+    "transcribe_nothing": {
+        "en": "All entries already have transcripts.",
+        "ru": "Все записи уже имеют транскрипты.",
+    },
+    "transcribe_in_progress": {
+        "en": "Transcription is already in progress.",
+        "ru": "Транскрибирование уже выполняется.",
+    },
+    "delete": {
+        "en": "Delete",
+        "ru": "Удалить",
+    },
 
     # Training Tab
     "training_title": {
