@@ -399,58 +399,60 @@ _TRANSLATIONS: Dict[str, Dict[str, str]] = {
 
     # About dialog
     "about_title": {
-        "en": "About Qwen3-TTS GUI",
-        "ru": "О программе Qwen3-TTS GUI",
+        "en": "About",
+        "ru": "О программе",
     },
-    "about_description": {
-        "en": "A modern interface for Qwen3 Text-to-Speech.",
-        "ru": "Современный интерфейс для Qwen3 Text-to-Speech.",
-    },
-    "about_features": {
-        "en": "Features:",
-        "ru": "Возможности:",
-    },
-    "about_feature_1": {
-        "en": "Multiple voice modes (Custom, Design, Clone)",
-        "ru": "Различные режимы голоса (Custom, Design, Clone)",
-    },
-    "about_feature_2": {
-        "en": "Built-in media player",
-        "ru": "Встроенный медиаплеер",
-    },
-    "about_feature_3": {
-        "en": "Dataset builder",
-        "ru": "Создание датасетов",
-    },
-    "about_feature_4": {
-        "en": "Voice training tools",
-        "ru": "Инструменты обучения голоса",
+    "about_text": {
+        "en": """<h2>Qwen3-TTS GUI</h2>
+<p>Version {version}</p>
+<p>GUI for <a href="https://github.com/QwenLM/Qwen3-TTS">Qwen3-TTS</a> by Alibaba Cloud.</p>
+<p><a href="https://github.com/{repo}">GitHub</a> · MIT License</p>""",
+        "ru": """<h2>Qwen3-TTS GUI</h2>
+<p>Версия {version}</p>
+<p>Интерфейс для <a href="https://github.com/QwenLM/Qwen3-TTS">Qwen3-TTS</a> от Alibaba Cloud.</p>
+<p><a href="https://github.com/{repo}">GitHub</a> · Лицензия MIT</p>""",
     },
 
-    # Update dialog
+    # Update menu
+    "menu_auto_update": {
+        "en": "Auto-update on Startup",
+        "ru": "Автообновление при запуске",
+    },
     "update_available": {
         "en": "Update Available",
         "ru": "Доступно обновление",
     },
     "update_message": {
-        "en": "A new version ({version}) is available!\nCurrent version: {current}\n\nWould you like to open the download page?",
-        "ru": "Доступна новая версия ({version})!\nТекущая версия: {current}\n\nОткрыть страницу загрузки?",
+        "en": "A new version ({version}) is available!\nCurrent version: {current}\n\nInstall update now?",
+        "ru": "Доступна новая версия ({version})!\nТекущая версия: {current}\n\nУстановить обновление?",
+    },
+    "update_restart_required": {
+        "en": "Update Installed",
+        "ru": "Обновление установлено",
+    },
+    "update_restart_msg": {
+        "en": "Update installed successfully!\nPlease restart the application.",
+        "ru": "Обновление успешно установлено!\nПожалуйста, перезапустите приложение.",
     },
     "up_to_date": {
         "en": "Up to Date",
         "ru": "Актуальная версия",
     },
     "up_to_date_msg": {
-        "en": "You have the latest version!",
-        "ru": "У вас последняя версия!",
+        "en": "You have the latest version ({version}).",
+        "ru": "У вас последняя версия ({version}).",
     },
     "update_failed": {
-        "en": "Update Check Failed",
-        "ru": "Ошибка проверки обновлений",
+        "en": "Update Failed",
+        "ru": "Ошибка обновления",
     },
     "update_failed_msg": {
         "en": "Could not check for updates.",
         "ru": "Не удалось проверить обновления.",
+    },
+    "checking_updates": {
+        "en": "Checking for updates...",
+        "ru": "Проверка обновлений...",
     },
 
     # File dialogs

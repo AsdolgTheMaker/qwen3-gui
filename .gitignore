@@ -39,3 +39,6 @@ Thumbs.db
 
 # Config with potential secrets
 config.json
+
+# User settings (auto-update preference, etc.)
+.settings.json

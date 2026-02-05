@@ -25,6 +25,7 @@ SCRIPT_DIR = Path(__file__).parent.absolute()
 VENV_DIR = SCRIPT_DIR / ".venv"
 PACKAGE_DIR = SCRIPT_DIR / "qwen3_gui"
 VERSION_FILE = PACKAGE_DIR / "__init__.py"
+SETTINGS_FILE = SCRIPT_DIR / ".settings.json"
 
 GITHUB_REPO = "AsdolgTheMaker/qwen3-gui"
 GITHUB_API_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
@@ -36,6 +37,21 @@ if sys.platform == "win32":
 else:
     VENV_PYTHON = VENV_DIR / "bin" / "python"
     VENV_PIP = VENV_DIR / "bin" / "pip"
+
+
+# ---------------------------------------------------------------------------
+# Settings utilities
+# ---------------------------------------------------------------------------
+
+def _get_auto_update_enabled() -> bool:
+    """Check if auto-update is enabled in settings."""
+    try:
+        if SETTINGS_FILE.exists():
+            data = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
+            return data.get("auto_update", True)
+    except Exception:
+        pass
+    return True  # Default: enabled
 
 
 # ---------------------------------------------------------------------------
@@ -323,8 +339,10 @@ def bootstrap(skip_update: bool = False, force_update: bool = False):
         return
 
     # Check for updates before setting up venv (uses system Python's urllib)
-    if not skip_update:
+    if not skip_update and _get_auto_update_enabled():
         check_for_updates(force=force_update)
+    elif not skip_update and not _get_auto_update_enabled():
+        print("[update] Auto-update disabled in settings, skipping")
 
     # Not in venv - set up and re-exec
     _ensure_venv()

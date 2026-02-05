@@ -5,18 +5,84 @@ Main application window.
 import sys
 import os
 import subprocess
-import webbrowser
+import json
+from pathlib import Path
 
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTabWidget,
-    QSplitter, QMessageBox, QApplication, QComboBox, QLabel
+    QSplitter, QMessageBox, QApplication, QMenu
 )
-from PySide6.QtCore import Qt, QSettings
-from PySide6.QtGui import QAction, QKeySequence
+from PySide6.QtCore import Qt, QSettings, QThread, Signal
+from PySide6.QtGui import QAction, QActionGroup, QKeySequence
 
-from .constants import APP_VERSION, GITHUB_REPO, UPDATE_URL, OUTPUT_DIR
+from .constants import APP_VERSION, GITHUB_REPO, OUTPUT_DIR
 from .translations import tr, LANGUAGES, get_language, set_language
 from .widgets import MediaPlayerWidget, OutputLogWidget, TTSTab, DatasetBuilderTab, TrainingTab
+
+# Settings file for run.py to read (QSettings not accessible before Qt loads)
+SCRIPT_DIR = Path(__file__).parent.parent.absolute()
+SETTINGS_FILE = SCRIPT_DIR / ".settings.json"
+
+
+def get_auto_update_enabled() -> bool:
+    """Get auto-update setting (readable by run.py)."""
+    try:
+        if SETTINGS_FILE.exists():
+            data = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
+            return data.get("auto_update", True)
+    except Exception:
+        pass
+    return True  # Default: enabled
+
+
+def set_auto_update_enabled(enabled: bool):
+    """Save auto-update setting."""
+    try:
+        data = {}
+        if SETTINGS_FILE.exists():
+            data = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
+        data["auto_update"] = enabled
+        SETTINGS_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+
+
+class UpdateWorker(QThread):
+    """Background worker for checking/installing updates."""
+    finished = Signal(bool, str, str)  # success, message, new_version
+
+    def __init__(self, install: bool = False):
+        super().__init__()
+        self.install = install
+
+    def run(self):
+        try:
+            # Import update functions from run.py
+            import importlib.util
+            spec = importlib.util.spec_from_file_location("run", SCRIPT_DIR / "run.py")
+            run_module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(run_module)
+
+            local_ver = run_module._get_local_version()
+            remote_ver = run_module._get_remote_version()
+
+            if remote_ver == "0.0.0":
+                self.finished.emit(False, "Could not check remote version", "")
+                return
+
+            if run_module._version_gt(remote_ver, local_ver):
+                if self.install:
+                    success = run_module._perform_update()
+                    if success:
+                        self.finished.emit(True, "update_installed", remote_ver)
+                    else:
+                        self.finished.emit(False, "Update installation failed", "")
+                else:
+                    self.finished.emit(True, "update_available", remote_ver)
+            else:
+                self.finished.emit(True, "up_to_date", local_ver)
+        except Exception as e:
+            self.finished.emit(False, str(e), "")
 
 
 class MainWindow(QMainWindow):
@@ -34,6 +100,8 @@ class MainWindow(QMainWindow):
         self._setup_ui()
         self._setup_menu()
         self._restore_geometry()
+
+        self._update_worker = None
 
     def _setup_ui(self):
         # Central widget with splitter
@@ -89,35 +157,6 @@ class MainWindow(QMainWindow):
         content_layout.addWidget(splitter)
         main_layout.addLayout(content_layout, stretch=1)
 
-        # Bottom bar with language selector
-        bottom_bar = QWidget()
-        bottom_bar.setMaximumHeight(35)
-        bottom_layout = QHBoxLayout(bottom_bar)
-        bottom_layout.setContentsMargins(10, 2, 10, 5)
-
-        bottom_layout.addStretch()
-
-        # Language selector
-        lang_label = QLabel(tr("interface_language"))
-        bottom_layout.addWidget(lang_label)
-
-        self.lang_combo = QComboBox()
-        self.lang_combo.setMaximumWidth(120)
-        for code, name in LANGUAGES.items():
-            self.lang_combo.addItem(name, code)
-
-        # Set current language
-        current_lang = get_language()
-        for i in range(self.lang_combo.count()):
-            if self.lang_combo.itemData(i) == current_lang:
-                self.lang_combo.setCurrentIndex(i)
-                break
-
-        self.lang_combo.currentIndexChanged.connect(self._on_language_changed)
-        bottom_layout.addWidget(self.lang_combo)
-
-        main_layout.addWidget(bottom_bar)
-
     def _setup_menu(self):
         menubar = self.menuBar()
 
@@ -135,6 +174,20 @@ class MainWindow(QMainWindow):
         self.exit_action.triggered.connect(self.close)
         self.file_menu.addAction(self.exit_action)
 
+        # Language menu
+        self.lang_menu = menubar.addMenu(tr("interface_language").rstrip(":"))
+        self.lang_action_group = QActionGroup(self)
+        self.lang_action_group.setExclusive(True)
+
+        current_lang = get_language()
+        for code, name in LANGUAGES.items():
+            action = QAction(name, self, checkable=True)
+            action.setData(code)
+            action.setChecked(code == current_lang)
+            action.triggered.connect(self._on_language_changed)
+            self.lang_action_group.addAction(action)
+            self.lang_menu.addAction(action)
+
         # Help menu
         self.help_menu = menubar.addMenu(tr("menu_help"))
 
@@ -142,14 +195,23 @@ class MainWindow(QMainWindow):
         self.check_update_action.triggered.connect(self._check_updates)
         self.help_menu.addAction(self.check_update_action)
 
+        self.auto_update_action = QAction(tr("menu_auto_update"), self, checkable=True)
+        self.auto_update_action.setChecked(get_auto_update_enabled())
+        self.auto_update_action.triggered.connect(self._toggle_auto_update)
+        self.help_menu.addAction(self.auto_update_action)
+
         self.help_menu.addSeparator()
 
         self.about_action = QAction(tr("menu_about"), self)
         self.about_action.triggered.connect(self._show_about)
         self.help_menu.addAction(self.about_action)
 
-    def _on_language_changed(self, index: int):
-        lang_code = self.lang_combo.itemData(index)
+    def _on_language_changed(self):
+        action = self.lang_action_group.checkedAction()
+        if not action:
+            return
+
+        lang_code = action.data()
         set_language(lang_code)
 
         # Save preference
@@ -163,6 +225,10 @@ class MainWindow(QMainWindow):
             msg = "Language changed. Please restart the application to apply changes."
 
         QMessageBox.information(self, "Qwen3-TTS", msg)
+
+    def _toggle_auto_update(self):
+        enabled = self.auto_update_action.isChecked()
+        set_auto_update_enabled(enabled)
 
     def _restore_geometry(self):
         settings = QSettings("AsdolgTheMaker", "Qwen3TTS")
@@ -194,41 +260,54 @@ class MainWindow(QMainWindow):
             subprocess.run(["xdg-open", OUTPUT_DIR])
 
     def _check_updates(self):
-        try:
-            import requests
-            response = requests.get(UPDATE_URL, timeout=10)
-            if response.status_code == 200:
-                data = response.json()
-                latest_version = data.get("tag_name", "").lstrip("v")
-                if latest_version and latest_version != APP_VERSION:
-                    reply = QMessageBox.question(
-                        self,
-                        tr("update_available"),
-                        tr("update_message", version=latest_version, current=APP_VERSION),
-                        QMessageBox.Yes | QMessageBox.No
-                    )
-                    if reply == QMessageBox.Yes:
-                        webbrowser.open(data.get("html_url", f"https://github.com/{GITHUB_REPO}/releases"))
-                else:
-                    QMessageBox.information(self, tr("up_to_date"), tr("up_to_date_msg"))
-            else:
-                QMessageBox.warning(self, tr("update_failed"), tr("update_failed_msg"))
-        except Exception as e:
-            QMessageBox.warning(self, tr("update_failed"), f"{tr('update_failed_msg')}\n{e}")
+        """Check for updates and offer to install."""
+        self.check_update_action.setEnabled(False)
+        self.check_update_action.setText(tr("checking_updates"))
+
+        self._update_worker = UpdateWorker(install=False)
+        self._update_worker.finished.connect(self._on_update_check_done)
+        self._update_worker.start()
+
+    def _on_update_check_done(self, success: bool, message: str, version: str):
+        self.check_update_action.setText(tr("menu_check_updates"))
+        self.check_update_action.setEnabled(True)
+
+        if not success:
+            QMessageBox.warning(self, tr("update_failed"), f"{tr('update_failed_msg')}\n{message}")
+            return
+
+        if message == "up_to_date":
+            QMessageBox.information(
+                self, tr("up_to_date"),
+                tr("up_to_date_msg", version=version)
+            )
+        elif message == "update_available":
+            reply = QMessageBox.question(
+                self,
+                tr("update_available"),
+                tr("update_message", version=version, current=APP_VERSION),
+                QMessageBox.Yes | QMessageBox.No
+            )
+            if reply == QMessageBox.Yes:
+                self._install_update()
+        elif message == "update_installed":
+            QMessageBox.information(
+                self, tr("update_restart_required"),
+                tr("update_restart_msg")
+            )
+
+    def _install_update(self):
+        """Install the update."""
+        self.check_update_action.setEnabled(False)
+        self.check_update_action.setText(tr("checking_updates"))
+
+        self._update_worker = UpdateWorker(install=True)
+        self._update_worker.finished.connect(self._on_update_check_done)
+        self._update_worker.start()
 
     def _show_about(self):
         QMessageBox.about(
             self,
             tr("about_title"),
-            f"<h2>{tr('app_title')}</h2>"
-            f"<p>Version {APP_VERSION}</p>"
-            f"<p>{tr('about_description')}</p>"
-            f"<p>{tr('about_features')}</p>"
-            f"<ul>"
-            f"<li>{tr('about_feature_1')}</li>"
-            f"<li>{tr('about_feature_2')}</li>"
-            f"<li>{tr('about_feature_3')}</li>"
-            f"<li>{tr('about_feature_4')}</li>"
-            f"</ul>"
-            f"<p><a href='https://github.com/{GITHUB_REPO}'>GitHub Repository</a></p>"
+            tr("about_text", version=APP_VERSION, repo=GITHUB_REPO)
         )
