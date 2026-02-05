@@ -1,0 +1,38 @@
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Output files
+output/
+*.wav
+*.mp3
+*.flac
+
+# Datasets (contain user data)
+datasets/
+
+# Trained models (large files)
+trained_models/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Config with potential secrets
+config.json
