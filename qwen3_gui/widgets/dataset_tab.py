@@ -8,11 +8,11 @@ from pathlib import Path
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QLineEdit, QTableWidget, QTableWidgetItem, QHeaderView,
-    QFileDialog, QMessageBox, QProgressBar
+    QFileDialog, QMessageBox, QProgressBar, QComboBox
 )
 from PySide6.QtCore import Qt, QSettings
 
-from ..constants import DATASETS_DIR
+from ..constants import DATASETS_DIR, LANGUAGES as TTS_LANGUAGES
 from ..translations import tr
 from ..workers import TranscriptionWorker
 
@@ -55,6 +55,13 @@ class DatasetBuilderTab(QWidget):
         import_layout.addWidget(import_folder_btn)
 
         import_layout.addStretch()
+
+        import_layout.addWidget(QLabel(tr("language") + ":"))
+        self.transcribe_lang_combo = QComboBox()
+        self.transcribe_lang_combo.addItems(TTS_LANGUAGES)
+        self.transcribe_lang_combo.setCurrentText("Auto")
+        self.transcribe_lang_combo.setMaximumWidth(100)
+        import_layout.addWidget(self.transcribe_lang_combo)
 
         self.transcribe_all_btn = QPushButton(tr("transcribe_all"))
         self.transcribe_all_btn.clicked.connect(self._transcribe_all)
@@ -282,7 +289,8 @@ class DatasetBuilderTab(QWidget):
         self.transcribe_progress.show()
         self.transcribe_all_btn.setEnabled(False)
 
-        self._transcription_worker = TranscriptionWorker(files)
+        lang = self.transcribe_lang_combo.currentText()
+        self._transcription_worker = TranscriptionWorker(files, language=lang)
         self._transcription_worker.progress.connect(self._on_transcribe_progress)
         self._transcription_worker.result.connect(self._on_transcribe_result)
         self._transcription_worker.finished.connect(self._on_transcribe_finished)
