@@ -16,6 +16,7 @@ import subprocess
 import shutil
 import json
 import tempfile
+import time
 import zipfile
 from pathlib import Path
 from urllib.request import urlopen, Request
@@ -93,7 +94,12 @@ def _version_gt(v1: str, v2: str) -> bool:
 
 def _fetch_json(url: str, timeout: int = 10) -> dict:
     """Fetch JSON from URL."""
-    req = Request(url, headers={"User-Agent": "Qwen3-TTS-GUI-Updater"})
+    # Add cache-busting to avoid GitHub CDN caching
+    cache_bust = f"{'&' if '?' in url else '?'}_={int(time.time())}"
+    req = Request(url + cache_bust, headers={
+        "User-Agent": "Qwen3-TTS-GUI-Updater",
+        "Cache-Control": "no-cache",
+    })
     with urlopen(req, timeout=timeout) as response:
         return json.loads(response.read().decode("utf-8"))
 
@@ -115,7 +121,12 @@ def _get_remote_version() -> str:
         # If no releases, try to get version from main branch
         try:
             raw_url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/main/qwen3_gui/__init__.py"
-            req = Request(raw_url, headers={"User-Agent": "Qwen3-TTS-GUI-Updater"})
+            # Add cache-busting to avoid GitHub CDN caching
+            cache_bust = f"?_={int(time.time())}"
+            req = Request(raw_url + cache_bust, headers={
+                "User-Agent": "Qwen3-TTS-GUI-Updater",
+                "Cache-Control": "no-cache",
+            })
             with urlopen(req, timeout=10) as response:
                 content = response.read().decode("utf-8")
                 for line in content.splitlines():
