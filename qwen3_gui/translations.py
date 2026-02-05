@@ -480,6 +480,14 @@ _TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "en": "Full training implementation requires additional setup.\nThis feature is a placeholder for the training pipeline.\nSee qwen-tts documentation for training instructions.",
         "ru": "Полная реализация обучения требует дополнительной настройки.\nЭта функция является заглушкой для пайплайна обучения.\nСм. документацию qwen-tts для инструкций по обучению.",
     },
+    "training_complete": {
+        "en": "Training Complete",
+        "ru": "Обучение завершено",
+    },
+    "training_failed": {
+        "en": "Training Failed",
+        "ru": "Ошибка обучения",
+    },
 
     # Media Player
     "audio_player": {

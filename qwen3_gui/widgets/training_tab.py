@@ -15,6 +15,7 @@ from PySide6.QtGui import QFont
 from ..constants import DATASETS_DIR
 from ..tooltips import set_tooltip
 from ..translations import tr
+from ..workers import TrainingWorker
 from .output_log import OutputLogWidget
 
 
@@ -25,6 +26,7 @@ class TrainingTab(QWidget):
         super().__init__()
         self.output_log = output_log
         self._settings = QSettings("AsdolgTheMaker", "Qwen3TTS")
+        self._worker = None
         self._setup_ui()
         self._restore_state()
 
@@ -86,10 +88,10 @@ class TrainingTab(QWidget):
         set_tooltip(lr_label, "learning_rate")
         params_layout.addWidget(lr_label, row, 0)
         self.lr_spin = QDoubleSpinBox()
-        self.lr_spin.setRange(0.000001, 0.01)
-        self.lr_spin.setDecimals(6)
-        self.lr_spin.setSingleStep(0.00001)
-        self.lr_spin.setValue(0.0001)
+        self.lr_spin.setRange(0.0000001, 0.001)
+        self.lr_spin.setDecimals(7)
+        self.lr_spin.setSingleStep(0.000001)
+        self.lr_spin.setValue(0.000002)  # 2e-6, recommended for fine-tuning
         params_layout.addWidget(self.lr_spin, row, 1)
         row += 1
 
@@ -136,6 +138,7 @@ class TrainingTab(QWidget):
 
         self.stop_btn = QPushButton(tr("stop_training"))
         self.stop_btn.setEnabled(False)
+        self.stop_btn.clicked.connect(self._stop_training)
         controls_layout.addWidget(self.stop_btn)
 
         controls_layout.addStretch()
@@ -188,14 +191,66 @@ class TrainingTab(QWidget):
         self._log("log", f"Epochs: {self.epochs_spin.value()}")
         self._log("log", f"Learning Rate: {self.lr_spin.value()}")
         self._log("log", f"Batch Size: {self.batch_spin.value()}")
-        self._log("log_warning", tr("training_placeholder"))
 
-        # TODO: Implement actual training pipeline
-        # This would typically involve:
-        # 1. Loading the dataset
-        # 2. Setting up the training loop
-        # 3. Fine-tuning the model
-        # 4. Saving checkpoints
+        # Prepare training parameters
+        params = {
+            "dataset": dataset,
+            "model_name": model_name,
+            "base_model": self.base_model_combo.currentIndex(),
+            "epochs": self.epochs_spin.value(),
+            "learning_rate": self.lr_spin.value(),
+            "batch_size": self.batch_spin.value(),
+            "device": "cuda:0",  # TODO: Make configurable
+        }
+
+        # Update UI state
+        self.train_btn.setEnabled(False)
+        self.stop_btn.setEnabled(True)
+        self.progress_bar.show()
+        self.progress_bar.setRange(0, params["epochs"])
+        self.progress_bar.setValue(0)
+
+        # Create and start worker
+        self._worker = TrainingWorker(params)
+        self._worker.progress.connect(self._on_progress)
+        self._worker.log.connect(self._on_log)
+        self._worker.epoch_progress.connect(self._on_epoch_progress)
+        self._worker.finished.connect(self._on_finished)
+        self._worker.start()
+
+    def _stop_training(self):
+        """Stop the training worker."""
+        if self._worker:
+            self._log("log_warning", "Cancelling training...")
+            self._worker.cancel()
+
+    def _on_progress(self, message: str):
+        """Handle progress signal from worker."""
+        self._log("log_progress", message)
+
+    def _on_log(self, message: str):
+        """Handle log signal from worker."""
+        self._log("log", message)
+
+    def _on_epoch_progress(self, epoch: int, total_epochs: int, loss: float):
+        """Handle epoch progress signal from worker."""
+        self.progress_bar.setValue(epoch)
+        self._log("log_info", f"Epoch {epoch}/{total_epochs} - Loss: {loss:.4f}")
+
+    def _on_finished(self, success: bool, message: str):
+        """Handle training finished signal."""
+        self._worker = None
+        self.train_btn.setEnabled(True)
+        self.stop_btn.setEnabled(False)
+        self.progress_bar.hide()
+
+        if success:
+            self._log("log_success", message)
+            QMessageBox.information(self, tr("training_complete"), message)
+        else:
+            self._log("log_error", message)
+            if "cancelled" not in message.lower():
+                QMessageBox.warning(self, tr("training_failed"), message)
 
     def _save_state(self):
         """Save widget state to settings."""
@@ -218,7 +273,7 @@ class TrainingTab(QWidget):
             self.base_model_combo.setCurrentIndex(idx)
 
         self.epochs_spin.setValue(s.value("epochs", 10, type=int))
-        self.lr_spin.setValue(s.value("learning_rate", 0.0001, type=float))
+        self.lr_spin.setValue(s.value("learning_rate", 0.000002, type=float))
         self.batch_spin.setValue(s.value("batch_size", 4, type=int))
         self.model_name_edit.setText(s.value("model_name", "", type=str))
         s.endGroup()

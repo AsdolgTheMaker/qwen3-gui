@@ -199,11 +199,18 @@ class GenerationWorker(QThread):
 
 
 class TrainingWorker(QThread):
-    """Worker thread for model training (placeholder)."""
+    """Worker thread for Qwen3-TTS fine-tuning."""
 
     progress = Signal(str)
     log = Signal(str)
+    epoch_progress = Signal(int, int, float)  # epoch, total_epochs, loss
     finished = Signal(bool, str)  # success, message
+
+    # Model name mapping
+    MODEL_MAP = {
+        0: "Qwen/Qwen3-TTS-12Hz-1.7B-Base",  # 1.7B (recommended)
+        1: "Qwen/Qwen3-TTS-12Hz-0.6B-Base",  # 0.6B (faster)
+    }
 
     def __init__(self, params: dict):
         super().__init__()
@@ -214,17 +221,117 @@ class TrainingWorker(QThread):
         """Request cancellation of training."""
         self._cancelled = True
 
-    def run(self):
-        # TODO: Implement actual training pipeline
-        # This would typically involve:
-        # 1. Loading the dataset
-        # 2. Setting up the training loop with the base model
-        # 3. Fine-tuning with the specified parameters
-        # 4. Saving checkpoints
+    def _is_cancelled(self) -> bool:
+        """Check if training was cancelled."""
+        return self._cancelled
 
-        self.log.emit("Training implementation is a placeholder.")
-        self.log.emit("See qwen-tts documentation for training instructions.")
-        self.finished.emit(False, "Training not yet implemented")
+    def run(self):
+        from pathlib import Path
+        import tempfile
+
+        try:
+            from .training import prepare_training_data
+            from .training.prepare import convert_dataset_to_jsonl
+            from .training.trainer import run_training
+            from .constants import DATASETS_DIR, MODELS_DIR
+
+            dataset_name = self.params["dataset"]
+            model_name = self.params["model_name"]
+            base_model_idx = self.params.get("base_model", 0)
+            epochs = self.params.get("epochs", 10)
+            learning_rate = self.params.get("learning_rate", 2e-6)
+            batch_size = self.params.get("batch_size", 2)
+            device = self.params.get("device", "cuda:0")
+
+            base_model = self.MODEL_MAP.get(base_model_idx, self.MODEL_MAP[0])
+            dataset_dir = DATASETS_DIR / dataset_name
+            output_dir = MODELS_DIR / model_name
+
+            self.log.emit(f"Starting training pipeline...")
+            self.log.emit(f"Dataset: {dataset_name}")
+            self.log.emit(f"Base model: {base_model}")
+            self.log.emit(f"Output: {output_dir}")
+
+            # Create temp directory for intermediate files
+            with tempfile.TemporaryDirectory() as tmpdir:
+                tmpdir = Path(tmpdir)
+                raw_jsonl = tmpdir / "train_raw.jsonl"
+                prepared_jsonl = tmpdir / "train_prepared.jsonl"
+
+                # Step 1: Convert dataset format
+                self.progress.emit("Step 1/3: Converting dataset format...")
+                self.log.emit("Converting transcript.txt to JSONL format...")
+
+                try:
+                    num_samples = convert_dataset_to_jsonl(
+                        dataset_dir=dataset_dir,
+                        output_jsonl=raw_jsonl,
+                        progress_callback=self.log.emit
+                    )
+                    self.log.emit(f"Converted {num_samples} samples")
+                except Exception as e:
+                    self.finished.emit(False, f"Dataset conversion failed: {e}")
+                    return
+
+                if self._cancelled:
+                    self.finished.emit(False, "Training cancelled")
+                    return
+
+                # Step 2: Prepare training data (tokenize audio)
+                self.progress.emit("Step 2/3: Preparing training data (tokenizing audio)...")
+                self.log.emit("Tokenizing audio files with Qwen3-TTS-Tokenizer...")
+
+                try:
+                    prepare_training_data(
+                        input_jsonl=raw_jsonl,
+                        output_jsonl=prepared_jsonl,
+                        device=device,
+                        progress_callback=self.log.emit
+                    )
+                except Exception as e:
+                    self.finished.emit(False, f"Data preparation failed: {e}")
+                    return
+
+                if self._cancelled:
+                    self.finished.emit(False, "Training cancelled")
+                    return
+
+                # Step 3: Run training
+                self.progress.emit("Step 3/3: Training model...")
+                self.log.emit(f"Starting fine-tuning for {epochs} epochs...")
+
+                try:
+                    checkpoint = run_training(
+                        train_jsonl=prepared_jsonl,
+                        output_dir=output_dir,
+                        speaker_name=model_name,
+                        base_model=base_model,
+                        batch_size=batch_size,
+                        learning_rate=learning_rate,
+                        num_epochs=epochs,
+                        device=device,
+                        progress_callback=self.log.emit,
+                        epoch_callback=lambda e, t, l: self.epoch_progress.emit(e, t, l),
+                        cancel_check=self._is_cancelled
+                    )
+                except Exception as e:
+                    self.finished.emit(False, f"Training failed: {e}")
+                    return
+
+                if checkpoint:
+                    self.log.emit(f"Training complete!")
+                    self.log.emit(f"Model saved to: {checkpoint}")
+                    self.finished.emit(True, f"Training complete! Model saved to {checkpoint}")
+                else:
+                    self.finished.emit(False, "Training was cancelled or failed")
+
+        except ImportError as e:
+            self.log.emit(f"Missing dependency: {e}")
+            self.log.emit("Please ensure all required packages are installed.")
+            self.finished.emit(False, f"Missing dependency: {e}")
+        except Exception as e:
+            self.log.emit(f"Training error: {e}")
+            self.finished.emit(False, str(e))
 
 
 class TranscriptionWorker(QThread):
