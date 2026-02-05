@@ -86,11 +86,18 @@ def prepare_training_data(
         Number of samples processed
     """
     from qwen_tts import Qwen3TTSTokenizer
+    import torch
 
     if progress_callback:
         progress_callback(f"Loading tokenizer ({TOKENIZER_MODEL})...")
 
-    tokenizer = Qwen3TTSTokenizer.from_pretrained(TOKENIZER_MODEL, device=device)
+    # Load tokenizer (runs on CPU by default, handles device internally)
+    tokenizer = Qwen3TTSTokenizer.from_pretrained(TOKENIZER_MODEL)
+
+    # Move model to GPU if available for faster processing
+    if device.startswith("cuda") and torch.cuda.is_available():
+        if hasattr(tokenizer, 'model') and hasattr(tokenizer.model, 'to'):
+            tokenizer.model = tokenizer.model.to(device)
 
     # Load input data
     data_list = []
@@ -103,36 +110,26 @@ def prepare_training_data(
         progress_callback(f"Tokenizing {len(data_list)} audio files...")
 
     output_data = []
-    batch_audios = []
-    batch_indices = []
 
+    # Process one at a time to avoid memory issues and handle errors gracefully
     for idx, item in enumerate(data_list):
-        batch_audios.append(item["audio"])
-        batch_indices.append(idx)
-
-        # Process batch when full
-        if len(batch_audios) >= BATCH_SIZE:
-            codes = tokenizer.encode(batch_audios)
-            for i, code in enumerate(codes):
-                data_idx = batch_indices[i]
-                enriched = data_list[data_idx].copy()
-                enriched["audio_codes"] = code.cpu().tolist()
-                output_data.append(enriched)
-
-            if progress_callback:
-                progress_callback(f"Tokenized {len(output_data)}/{len(data_list)} samples...")
-
-            batch_audios = []
-            batch_indices = []
-
-    # Process remaining items
-    if batch_audios:
-        codes = tokenizer.encode(batch_audios)
-        for i, code in enumerate(codes):
-            data_idx = batch_indices[i]
-            enriched = data_list[data_idx].copy()
-            enriched["audio_codes"] = code.cpu().tolist()
+        try:
+            result = tokenizer.encode([item["audio"]])
+            # result.audio_codes is a list of tensors, one per input audio
+            # Each tensor has shape [num_codebooks, num_frames]
+            audio_codes = result.audio_codes[0]  # Get first (only) result
+            enriched = item.copy()
+            # Transpose to [frames, codebooks] for easier processing later
+            enriched["audio_codes"] = audio_codes.T.cpu().tolist()
             output_data.append(enriched)
+
+            if progress_callback and (idx + 1) % 10 == 0:
+                progress_callback(f"Tokenized {idx + 1}/{len(data_list)} samples...")
+
+        except Exception as e:
+            if progress_callback:
+                progress_callback(f"Warning: Failed to tokenize {item['audio']}: {e}")
+            continue
 
     # Write output
     with open(output_jsonl, "w", encoding="utf-8") as f:
