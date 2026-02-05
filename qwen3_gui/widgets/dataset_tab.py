@@ -169,19 +169,19 @@ class DatasetBuilderTab(QWidget):
         play_btn = QPushButton("▶")
         play_btn.setMaximumWidth(28)
         play_btn.setToolTip(tr("play"))
-        play_btn.clicked.connect(lambda checked, r=row: self._play_row(r))
+        play_btn.clicked.connect(lambda checked, w=actions_widget: self._play_row(self._get_row_for_widget(w)))
         actions_layout.addWidget(play_btn)
 
         transcribe_btn = QPushButton("T")
         transcribe_btn.setMaximumWidth(28)
         transcribe_btn.setToolTip(tr("transcribe"))
-        transcribe_btn.clicked.connect(lambda checked, r=row: self._transcribe_row(r))
+        transcribe_btn.clicked.connect(lambda checked, w=actions_widget: self._transcribe_row(self._get_row_for_widget(w)))
         actions_layout.addWidget(transcribe_btn)
 
         del_btn = QPushButton("✕")
         del_btn.setMaximumWidth(28)
         del_btn.setToolTip(tr("delete"))
-        del_btn.clicked.connect(lambda checked, r=row: self._delete_row(r))
+        del_btn.clicked.connect(lambda checked, w=actions_widget: self._delete_row(self._get_row_for_widget(w)))
         actions_layout.addWidget(del_btn)
 
         self.table.setCellWidget(row, 3, actions_widget)
@@ -206,7 +206,16 @@ class DatasetBuilderTab(QWidget):
             except Exception:
                 return "??:??"
 
+    def _get_row_for_widget(self, widget: QWidget) -> int:
+        """Find the current row index for a cell widget."""
+        for row in range(self.table.rowCount()):
+            if self.table.cellWidget(row, 3) == widget:
+                return row
+        return -1
+
     def _play_row(self, row: int):
+        if row < 0:
+            return
         item = self.table.item(row, 0)
         if item:
             audio_path = item.data(Qt.UserRole)
@@ -217,11 +226,15 @@ class DatasetBuilderTab(QWidget):
                 main_window.media_player._play()
 
     def _delete_row(self, row: int):
+        if row < 0:
+            return
         self.table.removeRow(row)
         self._update_info()
 
     def _transcribe_row(self, row: int):
         """Transcribe a single row."""
+        if row < 0:
+            return
         # Check if transcript already exists
         transcript_item = self.table.item(row, 2)
         if transcript_item and transcript_item.text().strip():
