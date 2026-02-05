@@ -336,7 +336,7 @@ class TTSTab(QWidget):
         left_layout.addWidget(self.progress_bar)
 
         self.status_label = QLabel(f"{tr('ready_device')} {self._device}")
-        self.status_label.setStyleSheet("color: #444;")
+        self.status_label.setStyleSheet("color: #999;")
         self.status_label.setWordWrap(False)
         # Prevent long status messages from expanding the window
         self.status_label.setMaximumWidth(500)
@@ -410,10 +410,15 @@ class TTSTab(QWidget):
         lang = self.lang_combo.currentText()
 
         self._ref_transcription_worker = TranscriptionWorker([(0, ref_path)], language=lang)
-        self._ref_transcription_worker.progress.connect(lambda msg: self._set_status(msg))
+        self._ref_transcription_worker.progress.connect(self._on_transcription_progress)
         self._ref_transcription_worker.result.connect(self._on_ref_transcription_result)
         self._ref_transcription_worker.finished.connect(self._on_ref_transcription_finished)
         self._ref_transcription_worker.start()
+
+    def _on_transcription_progress(self, message: str):
+        """Handle transcription progress."""
+        self._set_status(message)
+        self._log("log_progress", message)
 
     def _on_ref_transcription_result(self, row: int, transcription: str):
         """Handle reference transcription result."""

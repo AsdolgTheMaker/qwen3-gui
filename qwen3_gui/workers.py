@@ -2,6 +2,9 @@
 Background worker threads for Qwen3-TTS GUI.
 """
 
+import sys
+import io
+import re
 import torch
 import soundfile as sf
 from PySide6.QtCore import QThread, Signal
@@ -11,72 +14,64 @@ from .constants import MODELS, mode_of
 from .settings import get_whisper_model
 
 
-def _format_size(size_bytes):
-    """Format bytes to human readable string."""
-    for unit in ['B', 'KB', 'MB', 'GB']:
-        if size_bytes < 1024:
-            return f"{size_bytes:.1f}{unit}"
-        size_bytes /= 1024
-    return f"{size_bytes:.1f}TB"
+class _StderrCapture(io.TextIOBase):
+    """Capture stderr and parse tqdm progress, forwarding to callback."""
+
+    def __init__(self, callback, original):
+        self.callback = callback
+        self.original = original
+        self._buffer = ""
+        self._last_pct = -1
+
+    def write(self, text):
+        # Always write to original
+        if self.original:
+            self.original.write(text)
+
+        # Buffer and look for tqdm patterns
+        self._buffer += text
+
+        # tqdm progress pattern: "description:  XX%|" or just "XX%|"
+        match = re.search(r'(\d+)%\|', self._buffer)
+        if match:
+            pct = int(match.group(1))
+            # Only report every 5% to avoid flooding
+            if pct >= self._last_pct + 5 or pct == 100:
+                self._last_pct = pct
+                # Try to get filename from the line
+                desc_match = re.search(r'([^/\\:\s]+\.(safetensors|bin|model|json|txt)):', self._buffer)
+                if desc_match:
+                    self.callback(f"Downloading {desc_match.group(1)}: {pct}%")
+                else:
+                    self.callback(f"Downloading: {pct}%")
+
+        # Clear buffer on carriage return (tqdm uses \r for updates)
+        if '\r' in self._buffer or '\n' in self._buffer:
+            if '\n' in self._buffer:
+                self._last_pct = -1  # Reset for next file
+            self._buffer = ""
+
+        return len(text)
+
+    def flush(self):
+        if self.original:
+            self.original.flush()
+
+    def isatty(self):
+        return self.original.isatty() if self.original else False
 
 
 @contextmanager
-def redirect_hf_progress(callback):
-    """
-    Context manager to redirect HuggingFace download progress to a callback.
-
-    Args:
-        callback: Function that takes a message string
-    """
-    original_tqdm = None
-    tqdm_module = None
+def capture_download_progress(callback):
+    """Context manager to capture HuggingFace download progress from stderr."""
+    original_stderr = sys.stderr
+    capture = _StderrCapture(callback, original_stderr)
 
     try:
-        import sys
-
-        # Get the actual tqdm module from sys.modules
-        tqdm_module = sys.modules.get('huggingface_hub.utils.tqdm')
-        if tqdm_module is None:
-            # Import it to ensure it's loaded
-            import huggingface_hub.utils.tqdm
-            tqdm_module = sys.modules['huggingface_hub.utils.tqdm']
-
-        # Store original tqdm class
-        original_tqdm = tqdm_module.tqdm
-
-        # Create a custom tqdm that reports to our callback
-        class CallbackTqdm(original_tqdm):
-            def __init__(self, *args, **kwargs):
-                # Extract description for our messages
-                self._cb_desc = kwargs.get('desc', '')
-                super().__init__(*args, **kwargs)
-
-            def update(self, n=1):
-                super().update(n)
-                if self.total and self.total > 0:
-                    pct = 100 * self.n / self.total
-                    size_info = f"{_format_size(self.n)}/{_format_size(self.total)}"
-                    msg = f"Downloading {self._cb_desc}: {pct:.0f}% ({size_info})"
-                    callback(msg)
-
-            def close(self):
-                if self.total and self.n >= self.total:
-                    callback(f"Downloaded {self._cb_desc}: {_format_size(self.total)}")
-                super().close()
-
-        # Monkey-patch the module
-        tqdm_module.tqdm = CallbackTqdm
-
+        sys.stderr = capture
         yield
-
-    except Exception:
-        # If anything fails, just yield without patching
-        yield
-
     finally:
-        # Restore original if we patched it
-        if original_tqdm is not None and tqdm_module is not None:
-            tqdm_module.tqdm = original_tqdm
+        sys.stderr = original_stderr
 
 
 class GenerationWorker(QThread):
@@ -122,8 +117,7 @@ class GenerationWorker(QThread):
                 if self.params.get("flash_attn"):
                     kwargs["attn_implementation"] = "flash_attention_2"
 
-                # Redirect download progress to our signal
-                with redirect_hf_progress(self.progress.emit):
+                with capture_download_progress(self.progress.emit):
                     try:
                         model = Qwen3TTSModel.from_pretrained(model_id, **kwargs)
                     except Exception:
@@ -136,6 +130,8 @@ class GenerationWorker(QThread):
 
                 self.model_holder["model"] = model
                 self.model_holder["model_id"] = model_id
+            else:
+                self.progress.emit(f"Using cached {model_label}...")
 
             if self._cancelled:
                 self.finished.emit(False, "Cancelled", "")
@@ -265,11 +261,10 @@ class TranscriptionWorker(QThread):
 
             # Lazy load model (reload if model changed)
             if self._model_holder["model"] is None or self._model_holder["model_id"] != model_id:
-                self.progress.emit(f"Loading Whisper model ({model_id.split('/')[-1]})...")
+                self.progress.emit(f"Loading Whisper ({model_id.split('/')[-1]})...")
                 from transformers import WhisperProcessor, WhisperForConditionalGeneration
 
-                # Redirect download progress to our signal
-                with redirect_hf_progress(self.progress.emit):
+                with capture_download_progress(self.progress.emit):
                     self._model_holder["processor"] = WhisperProcessor.from_pretrained(model_id)
                     self._model_holder["model"] = WhisperForConditionalGeneration.from_pretrained(model_id)
 
