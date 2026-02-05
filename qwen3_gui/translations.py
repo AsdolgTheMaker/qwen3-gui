@@ -146,6 +146,14 @@ _TRANSLATIONS: Dict[str, Dict[str, str]] = {
         "en": "Use Flash Attention 2",
         "ru": "Использовать Flash Attention 2",
     },
+    "seed": {
+        "en": "Seed:",
+        "ru": "Сид:",
+    },
+    "random_seed": {
+        "en": "Random seed each generation",
+        "ru": "Случайный сид при каждой генерации",
+    },
     "output": {
         "en": "Output",
         "ru": "Вывод",
@@ -704,6 +712,32 @@ fall back to the normal (slower) method.</i>""",
 Нужен современный NVIDIA GPU (RTX 30xx или новее).<br><br>
 <i>При ошибках приложение автоматически<br>
 переключится на обычный (медленный) метод.</i>""",
+    },
+
+    "tooltip_seed": {
+        "en": """<b>Random seed</b><br><br>
+A number that controls the randomness of generation.<br>
+Using the same seed with the same settings produces<br>
+the same (or very similar) output.<br><br>
+<i>Useful for reproducing a result you liked!</i>""",
+        "ru": """<b>Сид генерации</b><br><br>
+Число, контролирующее случайность генерации.<br>
+Один и тот же сид с теми же настройками даёт<br>
+одинаковый (или очень похожий) результат.<br><br>
+<i>Полезно для воспроизведения понравившегося результата!</i>""",
+    },
+
+    "tooltip_random_seed": {
+        "en": """<b>Randomize seed</b><br><br>
+When ON: Each generation uses a new random seed,<br>
+giving different results each time.<br><br>
+When OFF: Uses the seed number you specify,<br>
+allowing you to reproduce results.""",
+        "ru": """<b>Случайный сид</b><br><br>
+ВКЛ: Каждая генерация использует новый случайный сид,<br>
+давая разные результаты каждый раз.<br><br>
+ВЫКЛ: Использует указанный вами сид,<br>
+позволяя воспроизводить результаты.""",
     },
 
     "tooltip_epochs": {

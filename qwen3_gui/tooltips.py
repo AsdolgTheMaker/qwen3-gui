@@ -29,6 +29,8 @@ TOOLTIP_KEYS = {
     "max_tokens": "tooltip_max_tokens",
     "dtype": "tooltip_dtype",
     "flash_attn": "tooltip_flash_attn",
+    "seed": "tooltip_seed",
+    "random_seed": "tooltip_random_seed",
     "epochs": "tooltip_epochs",
     "learning_rate": "tooltip_learning_rate",
     "batch_size": "tooltip_batch_size",

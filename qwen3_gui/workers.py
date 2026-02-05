@@ -72,6 +72,13 @@ class GenerationWorker(QThread):
             self.progress.emit("Generating speech...")
             model = self.model_holder["model"]
 
+            # Set seed for reproducibility
+            seed = self.params.get("seed")
+            if seed is not None:
+                torch.manual_seed(seed)
+                if torch.cuda.is_available():
+                    torch.cuda.manual_seed_all(seed)
+
             gen_kwargs = {
                 "max_new_tokens": self.params["max_tokens"],
                 "do_sample": True,

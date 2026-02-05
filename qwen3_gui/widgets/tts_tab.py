@@ -2,6 +2,7 @@
 Text-to-Speech tab widget.
 """
 
+import random
 from pathlib import Path
 from typing import Optional
 
@@ -224,6 +225,24 @@ class TTSTab(QWidget):
         set_tooltip(self.flash_check, "flash_attn")
         self.flash_check.setChecked(True)
         advanced_layout.addWidget(self.flash_check, row, 0, 1, 2)
+        row += 1
+
+        # Seed
+        seed_label = QLabel(tr("seed"))
+        set_tooltip(seed_label, "seed")
+        advanced_layout.addWidget(seed_label, row, 0)
+        self.seed_spin = QSpinBox()
+        self.seed_spin.setRange(0, 2147483647)
+        self.seed_spin.setValue(42)
+        advanced_layout.addWidget(self.seed_spin, row, 1)
+        row += 1
+
+        self.random_seed_check = QCheckBox(tr("random_seed"))
+        set_tooltip(self.random_seed_check, "random_seed")
+        self.random_seed_check.setChecked(True)
+        self.random_seed_check.toggled.connect(self._on_random_seed_toggled)
+        advanced_layout.addWidget(self.random_seed_check, row, 0, 1, 2)
+        self.seed_spin.setEnabled(False)  # Disabled by default (random mode)
 
         scroll_layout.addWidget(advanced_group)
 
@@ -312,6 +331,9 @@ class TTSTab(QWidget):
     def _on_speaker_changed(self, speaker: str):
         self.speaker_desc.setText(SPEAKER_INFO.get(speaker, ""))
 
+    def _on_random_seed_toggled(self, checked: bool):
+        self.seed_spin.setEnabled(not checked)
+
     def _browse_ref(self):
         path, _ = QFileDialog.getOpenFileName(
             self, tr("select_ref_audio"),
@@ -379,9 +401,16 @@ class TTSTab(QWidget):
         if len(self.text_edit.toPlainText().strip()) > 50:
             text_preview += "..."
 
+        # Determine seed
+        if self.random_seed_check.isChecked():
+            seed = random.randint(0, 2147483647)
+            self.seed_spin.setValue(seed)  # Show the seed that was used
+        else:
+            seed = self.seed_spin.value()
+
         self._log("log_info", f"Starting generation with {model_label}")
         self._log("log", f"Text: \"{text_preview}\"")
-        self._log("log", f"Language: {self.lang_combo.currentText()}, Speaker: {self.speaker_combo.currentText()}")
+        self._log("log", f"Language: {self.lang_combo.currentText()}, Speaker: {self.speaker_combo.currentText()}, Seed: {seed}")
 
         params = {
             "model_label": model_label,
@@ -399,6 +428,7 @@ class TTSTab(QWidget):
             "max_tokens": self.maxtok_spin.value(),
             "dtype": self.dtype_combo.currentText(),
             "flash_attn": self.flash_check.isChecked(),
+            "seed": seed,
             "output_path": str(out_path),
             "device": self._device,
         }
@@ -452,6 +482,8 @@ class TTSTab(QWidget):
         s.setValue("max_tokens", self.maxtok_spin.value())
         s.setValue("dtype", self.dtype_combo.currentIndex())
         s.setValue("flash_attn", self.flash_check.isChecked())
+        s.setValue("seed", self.seed_spin.value())
+        s.setValue("random_seed", self.random_seed_check.isChecked())
         s.endGroup()
 
     def _restore_state(self):
@@ -485,6 +517,10 @@ class TTSTab(QWidget):
             self.dtype_combo.setCurrentIndex(idx)
 
         self.flash_check.setChecked(s.value("flash_attn", True, type=bool))
+        self.seed_spin.setValue(s.value("seed", 42, type=int))
+        random_seed = s.value("random_seed", True, type=bool)
+        self.random_seed_check.setChecked(random_seed)
+        self.seed_spin.setEnabled(not random_seed)
         s.endGroup()
 
     def showEvent(self, event):
