@@ -15,7 +15,7 @@ from PySide6.QtCore import Qt, QSettings
 from PySide6.QtGui import QAction, QKeySequence
 
 from .constants import APP_VERSION, GITHUB_REPO, UPDATE_URL, OUTPUT_DIR
-from .widgets import MediaPlayerWidget, TTSTab, DatasetBuilderTab, TrainingTab
+from .widgets import MediaPlayerWidget, OutputLogWidget, TTSTab, DatasetBuilderTab, TrainingTab
 
 
 class MainWindow(QMainWindow):
@@ -41,33 +41,39 @@ class MainWindow(QMainWindow):
         # Left side - tabs
         self.tabs = QTabWidget()
 
-        # Media player (shared)
+        # Shared widgets
         self.media_player = MediaPlayerWidget()
+        self.output_log = OutputLogWidget()
 
-        # TTS tab
-        self.tts_tab = TTSTab(self.media_player)
+        # TTS tab (with access to media player and log)
+        self.tts_tab = TTSTab(self.media_player, self.output_log)
         self.tabs.addTab(self.tts_tab, "Text-to-Speech")
 
         # Dataset builder tab
         self.dataset_tab = DatasetBuilderTab()
         self.tabs.addTab(self.dataset_tab, "Dataset Builder")
 
-        # Training tab
-        self.training_tab = TrainingTab()
+        # Training tab (with access to log)
+        self.training_tab = TrainingTab(self.output_log)
         self.tabs.addTab(self.training_tab, "Voice Training")
 
         splitter.addWidget(self.tabs)
 
-        # Right side - media player
+        # Right side - media player and output log
         right_panel = QWidget()
         right_layout = QVBoxLayout(right_panel)
+        right_layout.setContentsMargins(5, 5, 5, 5)
+
+        # Media player at top
         right_layout.addWidget(self.media_player)
-        right_layout.addStretch()
+
+        # Output log takes remaining space
+        right_layout.addWidget(self.output_log, stretch=1)
 
         splitter.addWidget(right_panel)
 
-        # Set splitter sizes (70% tabs, 30% player)
-        splitter.setSizes([700, 300])
+        # Set splitter sizes (65% tabs, 35% right panel)
+        splitter.setSizes([650, 350])
 
         main_layout.addWidget(splitter)
 

@@ -20,14 +20,16 @@ from ..constants import (
 from ..tooltips import set_tooltip
 from ..workers import GenerationWorker
 from .media_player import MediaPlayerWidget
+from .output_log import OutputLogWidget
 
 
 class TTSTab(QWidget):
     """Main text-to-speech interface."""
 
-    def __init__(self, media_player: MediaPlayerWidget):
+    def __init__(self, media_player: MediaPlayerWidget, output_log: OutputLogWidget = None):
         super().__init__()
         self.media_player = media_player
+        self.output_log = output_log
         self.model_holder = {"model": None, "model_id": None}
         self.worker = None
         self._device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -353,18 +355,33 @@ class TTSTab(QWidget):
 
         return None
 
+    def _log(self, method: str, message: str):
+        """Helper to log if output_log is available."""
+        if self.output_log:
+            getattr(self.output_log, method)(message)
+
     def _on_generate(self):
         error = self._validate()
         if error:
             QMessageBox.warning(self, "Validation Error", error)
+            self._log("log_error", f"Validation failed: {error}")
             return
 
         # Ensure output directory exists
         out_path = Path(self.output_path_edit.text())
         out_path.parent.mkdir(parents=True, exist_ok=True)
 
+        model_label = self.model_combo.currentText()
+        text_preview = self.text_edit.toPlainText().strip()[:50]
+        if len(self.text_edit.toPlainText().strip()) > 50:
+            text_preview += "..."
+
+        self._log("log_info", f"Starting generation with {model_label}")
+        self._log("log", f"Text: \"{text_preview}\"")
+        self._log("log", f"Language: {self.lang_combo.currentText()}, Speaker: {self.speaker_combo.currentText()}")
+
         params = {
-            "model_label": self.model_combo.currentText(),
+            "model_label": model_label,
             "language": self.lang_combo.currentText(),
             "speaker": self.speaker_combo.currentText(),
             "text": self.text_edit.toPlainText().strip(),
@@ -396,9 +413,11 @@ class TTSTab(QWidget):
         if self.worker:
             self.worker.cancel()
             self.status_label.setText("Cancelling...")
+            self._log("log_warning", "Generation cancelled by user")
 
     def _on_progress(self, message: str):
         self.status_label.setText(message)
+        self._log("log_progress", message)
 
     def _on_finished(self, success: bool, message: str, output_path: str):
         self.generate_btn.setEnabled(True)
@@ -407,4 +426,8 @@ class TTSTab(QWidget):
         self.status_label.setText(message)
 
         if success and output_path:
+            self._log("log_success", f"Generation complete!")
+            self._log("log_audio_saved", output_path)
             self.media_player.load_file(output_path)
+        elif not success:
+            self._log("log_error", message)

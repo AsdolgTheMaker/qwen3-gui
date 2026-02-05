@@ -13,13 +13,15 @@ from PySide6.QtGui import QFont
 
 from ..constants import DATASETS_DIR
 from ..tooltips import set_tooltip
+from .output_log import OutputLogWidget
 
 
 class TrainingTab(QWidget):
     """Interface for training custom voice models."""
 
-    def __init__(self):
+    def __init__(self, output_log: OutputLogWidget = None):
         super().__init__()
+        self.output_log = output_log
         self._setup_ui()
 
     def _setup_ui(self):
@@ -158,6 +160,13 @@ class TrainingTab(QWidget):
                 if d.is_dir() and (d / "transcript.txt").exists():
                     self.dataset_combo.addItem(d.name)
 
+    def _log(self, method: str, message: str):
+        """Helper to log to both local log and output_log."""
+        timestamp = datetime.now().strftime('%H:%M:%S')
+        self.log_text.append(f"[{timestamp}] {message}")
+        if self.output_log:
+            getattr(self.output_log, method)(message)
+
     def _start_training(self):
         dataset = self.dataset_combo.currentText()
         if not dataset:
@@ -170,15 +179,14 @@ class TrainingTab(QWidget):
             return
 
         self.log_text.clear()
-        self.log_text.append(f"[{datetime.now().strftime('%H:%M:%S')}] Starting training...")
-        self.log_text.append(f"Dataset: {dataset}")
-        self.log_text.append(f"Epochs: {self.epochs_spin.value()}")
-        self.log_text.append(f"Learning Rate: {self.lr_spin.value()}")
-        self.log_text.append(f"Batch Size: {self.batch_spin.value()}")
-        self.log_text.append("")
-        self.log_text.append("NOTE: Full training implementation requires additional setup.")
-        self.log_text.append("This feature is a placeholder for the training pipeline.")
-        self.log_text.append("See qwen-tts documentation for training instructions.")
+        self._log("log_info", "Starting training...")
+        self._log("log", f"Dataset: {dataset}")
+        self._log("log", f"Epochs: {self.epochs_spin.value()}")
+        self._log("log", f"Learning Rate: {self.lr_spin.value()}")
+        self._log("log", f"Batch Size: {self.batch_spin.value()}")
+        self._log("log_warning", "Full training implementation requires additional setup.")
+        self._log("log", "This feature is a placeholder for the training pipeline.")
+        self._log("log", "See qwen-tts documentation for training instructions.")
 
         # TODO: Implement actual training pipeline
         # This would typically involve:
