@@ -10,6 +10,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Slot
 from PySide6.QtGui import QFont, QTextCursor, QColor
 
+from ..translations import tr
+
 
 class OutputLogWidget(QFrame):
     """Output log panel for displaying status messages and generation progress."""
@@ -26,13 +28,13 @@ class OutputLogWidget(QFrame):
         # Header with title and clear button
         header_layout = QHBoxLayout()
 
-        title = QLabel("Output Log")
+        title = QLabel(tr("output_log"))
         title.setFont(QFont("Segoe UI", 11, QFont.Bold))
         header_layout.addWidget(title)
 
         header_layout.addStretch()
 
-        clear_btn = QPushButton("Clear")
+        clear_btn = QPushButton(tr("clear"))
         clear_btn.setMaximumWidth(60)
         clear_btn.clicked.connect(self.clear)
         header_layout.addWidget(clear_btn)
@@ -54,8 +56,8 @@ class OutputLogWidget(QFrame):
         layout.addWidget(self.log_text)
 
         # Initial message
-        self.log_info("Qwen3-TTS GUI initialized")
-        self.log_info("Ready to generate speech")
+        self.log_info(tr("log_initialized"))
+        self.log_info(tr("log_ready"))
 
     def _timestamp(self) -> str:
         return datetime.now().strftime("%H:%M:%S")

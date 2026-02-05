@@ -14,10 +14,11 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 
 from ..constants import (
-    MODELS, SPEAKERS, SPEAKER_INFO, LANGUAGES, DTYPE_OPTIONS,
+    MODELS, SPEAKERS, SPEAKER_INFO, LANGUAGES as TTS_LANGUAGES, DTYPE_OPTIONS,
     OUTPUT_DIR, mode_of
 )
 from ..tooltips import set_tooltip
+from ..translations import tr
 from ..workers import GenerationWorker
 from .media_player import MediaPlayerWidget
 from .output_log import OutputLogWidget
@@ -51,7 +52,7 @@ class TTSTab(QWidget):
         scroll_layout = QVBoxLayout(scroll_content)
 
         # Model selection
-        model_group = QGroupBox("Model Selection")
+        model_group = QGroupBox(tr("model_selection"))
         set_tooltip(model_group, "model")
         model_layout = QVBoxLayout(model_group)
 
@@ -63,18 +64,18 @@ class TTSTab(QWidget):
         scroll_layout.addWidget(model_group)
 
         # Language
-        lang_group = QGroupBox("Language")
+        lang_group = QGroupBox(tr("language"))
         set_tooltip(lang_group, "language")
         lang_layout = QVBoxLayout(lang_group)
 
         self.lang_combo = QComboBox()
-        self.lang_combo.addItems(LANGUAGES)
+        self.lang_combo.addItems(TTS_LANGUAGES)
         lang_layout.addWidget(self.lang_combo)
 
         scroll_layout.addWidget(lang_group)
 
         # Speaker (Custom Voice only)
-        self.speaker_group = QGroupBox("Speaker")
+        self.speaker_group = QGroupBox(tr("speaker"))
         set_tooltip(self.speaker_group, "speaker")
         speaker_layout = QVBoxLayout(self.speaker_group)
 
@@ -91,62 +92,62 @@ class TTSTab(QWidget):
         scroll_layout.addWidget(self.speaker_group)
 
         # Text prompt
-        text_group = QGroupBox("Text to Speak")
+        text_group = QGroupBox(tr("text_to_speak"))
         set_tooltip(text_group, "text_prompt")
         text_layout = QVBoxLayout(text_group)
 
         self.text_edit = QTextEdit()
-        self.text_edit.setPlaceholderText("Enter the text you want the AI to speak...")
+        self.text_edit.setPlaceholderText(tr("text_placeholder"))
         self.text_edit.setMinimumHeight(100)
         text_layout.addWidget(self.text_edit)
 
         scroll_layout.addWidget(text_group)
 
         # Instruction
-        self.instruct_group = QGroupBox("Instruction (optional)")
+        self.instruct_group = QGroupBox(tr("instruction_optional"))
         set_tooltip(self.instruct_group, "instruction")
         instruct_layout = QVBoxLayout(self.instruct_group)
 
         self.instruct_edit = QTextEdit()
-        self.instruct_edit.setPlaceholderText("e.g., 'Speak happily' or 'Sound tired'...")
+        self.instruct_edit.setPlaceholderText(tr("instruction_placeholder"))
         self.instruct_edit.setMaximumHeight(80)
         instruct_layout.addWidget(self.instruct_edit)
 
         scroll_layout.addWidget(self.instruct_group)
 
         # Reference audio (Clone only)
-        self.ref_group = QGroupBox("Reference Audio (for cloning)")
+        self.ref_group = QGroupBox(tr("reference_audio"))
         set_tooltip(self.ref_group, "ref_audio")
         ref_layout = QVBoxLayout(self.ref_group)
 
         ref_file_layout = QHBoxLayout()
         self.ref_path_edit = QLineEdit()
-        self.ref_path_edit.setPlaceholderText("Path to reference audio file...")
+        self.ref_path_edit.setPlaceholderText(tr("ref_audio_placeholder"))
         ref_file_layout.addWidget(self.ref_path_edit)
 
-        self.ref_browse_btn = QPushButton("Browse...")
+        self.ref_browse_btn = QPushButton(tr("browse"))
         self.ref_browse_btn.clicked.connect(self._browse_ref)
         ref_file_layout.addWidget(self.ref_browse_btn)
 
         ref_layout.addLayout(ref_file_layout)
 
-        ref_text_label = QLabel("Reference Transcript:")
+        ref_text_label = QLabel(tr("reference_transcript"))
         set_tooltip(ref_text_label, "ref_text")
         ref_layout.addWidget(ref_text_label)
 
         self.ref_text_edit = QTextEdit()
-        self.ref_text_edit.setPlaceholderText("What's being said in the reference audio...")
+        self.ref_text_edit.setPlaceholderText(tr("ref_transcript_placeholder"))
         self.ref_text_edit.setMaximumHeight(60)
         ref_layout.addWidget(self.ref_text_edit)
 
-        self.xvector_check = QCheckBox("X-vector only mode (no transcript needed)")
+        self.xvector_check = QCheckBox(tr("xvector_mode"))
         set_tooltip(self.xvector_check, "xvector")
         ref_layout.addWidget(self.xvector_check)
 
         scroll_layout.addWidget(self.ref_group)
 
         # Advanced options
-        advanced_group = QGroupBox("Advanced Options")
+        advanced_group = QGroupBox(tr("advanced_options"))
         advanced_layout = QGridLayout(advanced_group)
         advanced_group.setCheckable(True)
         advanced_group.setChecked(False)
@@ -154,7 +155,7 @@ class TTSTab(QWidget):
         row = 0
 
         # Temperature
-        temp_label = QLabel("Temperature:")
+        temp_label = QLabel(tr("temperature"))
         set_tooltip(temp_label, "temperature")
         advanced_layout.addWidget(temp_label, row, 0)
         self.temp_spin = QDoubleSpinBox()
@@ -165,7 +166,7 @@ class TTSTab(QWidget):
         row += 1
 
         # Top-K
-        topk_label = QLabel("Top-K:")
+        topk_label = QLabel(tr("top_k"))
         set_tooltip(topk_label, "top_k")
         advanced_layout.addWidget(topk_label, row, 0)
         self.topk_spin = QSpinBox()
@@ -175,7 +176,7 @@ class TTSTab(QWidget):
         row += 1
 
         # Top-P
-        topp_label = QLabel("Top-P:")
+        topp_label = QLabel(tr("top_p"))
         set_tooltip(topp_label, "top_p")
         advanced_layout.addWidget(topp_label, row, 0)
         self.topp_spin = QDoubleSpinBox()
@@ -186,7 +187,7 @@ class TTSTab(QWidget):
         row += 1
 
         # Repetition penalty
-        rep_label = QLabel("Repetition Penalty:")
+        rep_label = QLabel(tr("repetition_penalty"))
         set_tooltip(rep_label, "rep_penalty")
         advanced_layout.addWidget(rep_label, row, 0)
         self.rep_spin = QDoubleSpinBox()
@@ -197,7 +198,7 @@ class TTSTab(QWidget):
         row += 1
 
         # Max tokens
-        maxtok_label = QLabel("Max Tokens:")
+        maxtok_label = QLabel(tr("max_tokens"))
         set_tooltip(maxtok_label, "max_tokens")
         advanced_layout.addWidget(maxtok_label, row, 0)
         self.maxtok_spin = QSpinBox()
@@ -208,7 +209,7 @@ class TTSTab(QWidget):
         row += 1
 
         # Dtype
-        dtype_label = QLabel("Dtype:")
+        dtype_label = QLabel(tr("dtype"))
         set_tooltip(dtype_label, "dtype")
         advanced_layout.addWidget(dtype_label, row, 0)
         self.dtype_combo = QComboBox()
@@ -217,7 +218,7 @@ class TTSTab(QWidget):
         row += 1
 
         # Flash attention
-        self.flash_check = QCheckBox("Use Flash Attention 2")
+        self.flash_check = QCheckBox(tr("flash_attention"))
         set_tooltip(self.flash_check, "flash_attn")
         self.flash_check.setChecked(True)
         advanced_layout.addWidget(self.flash_check, row, 0, 1, 2)
@@ -225,7 +226,7 @@ class TTSTab(QWidget):
         scroll_layout.addWidget(advanced_group)
 
         # Output file
-        output_group = QGroupBox("Output")
+        output_group = QGroupBox(tr("output"))
         output_layout = QVBoxLayout(output_group)
 
         output_file_layout = QHBoxLayout()
@@ -233,7 +234,7 @@ class TTSTab(QWidget):
         self.output_path_edit.setText(str(OUTPUT_DIR / "output.wav"))
         output_file_layout.addWidget(self.output_path_edit)
 
-        output_browse_btn = QPushButton("Browse...")
+        output_browse_btn = QPushButton(tr("browse"))
         output_browse_btn.clicked.connect(self._browse_output)
         output_file_layout.addWidget(output_browse_btn)
 
@@ -248,7 +249,7 @@ class TTSTab(QWidget):
         # Generate button and status at bottom of left panel
         btn_layout = QHBoxLayout()
 
-        self.generate_btn = QPushButton("Generate Speech")
+        self.generate_btn = QPushButton(tr("generate_speech"))
         self.generate_btn.setStyleSheet("""
             QPushButton {
                 background-color: #7c3aed;
@@ -268,7 +269,7 @@ class TTSTab(QWidget):
         self.generate_btn.clicked.connect(self._on_generate)
         btn_layout.addWidget(self.generate_btn)
 
-        self.cancel_btn = QPushButton("Cancel")
+        self.cancel_btn = QPushButton(tr("cancel"))
         self.cancel_btn.setEnabled(False)
         self.cancel_btn.clicked.connect(self._on_cancel)
         btn_layout.addWidget(self.cancel_btn)
@@ -281,7 +282,7 @@ class TTSTab(QWidget):
         self.progress_bar.hide()
         left_layout.addWidget(self.progress_bar)
 
-        self.status_label = QLabel(f"Ready. Device: {self._device}")
+        self.status_label = QLabel(f"{tr('ready_device')} {self._device}")
         self.status_label.setStyleSheet("color: #666;")
         left_layout.addWidget(self.status_label)
 
@@ -299,9 +300,9 @@ class TTSTab(QWidget):
         # Instruction - for custom and design
         self.instruct_group.setVisible(mode in ("custom", "design"))
         if mode == "design":
-            self.instruct_group.setTitle("Voice Description (required)")
+            self.instruct_group.setTitle(tr("voice_description_required"))
         else:
-            self.instruct_group.setTitle("Instruction (optional)")
+            self.instruct_group.setTitle(tr("instruction_optional"))
 
         # Reference - only for clone
         self.ref_group.setVisible(mode == "clone")
@@ -311,7 +312,7 @@ class TTSTab(QWidget):
 
     def _browse_ref(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, "Select Reference Audio",
+            self, tr("select_ref_audio"),
             "", "Audio Files (*.wav *.flac *.mp3 *.ogg);;All Files (*.*)"
         )
         if path:
@@ -319,7 +320,7 @@ class TTSTab(QWidget):
 
     def _browse_output(self):
         path, _ = QFileDialog.getSaveFileName(
-            self, "Save Output As",
+            self, tr("save_output_as"),
             self.output_path_edit.text(),
             "WAV Files (*.wav)"
         )
@@ -329,29 +330,29 @@ class TTSTab(QWidget):
     def _validate(self) -> Optional[str]:
         text = self.text_edit.toPlainText().strip()
         if not text:
-            return "Please enter some text to speak."
+            return tr("error_no_text")
 
         mode = mode_of(self.model_combo.currentText())
 
         if mode == "design":
             instruct = self.instruct_edit.toPlainText().strip()
             if not instruct:
-                return "Voice description is required for Voice Design mode."
+                return tr("error_no_voice_desc")
 
         if mode == "clone":
             ref = self.ref_path_edit.text().strip()
             if not ref:
-                return "Reference audio file is required for Voice Clone mode."
+                return tr("error_no_ref_audio")
             if not Path(ref).is_file():
-                return f"Reference audio file not found: {ref}"
+                return f"{tr('error_ref_not_found')} {ref}"
             if not self.xvector_check.isChecked():
                 ref_text = self.ref_text_edit.toPlainText().strip()
                 if not ref_text:
-                    return "Reference transcript is required (or enable X-vector only mode)."
+                    return tr("error_no_transcript")
 
         out = self.output_path_edit.text().strip()
         if not out:
-            return "Please specify an output file path."
+            return tr("error_no_output")
 
         return None
 
@@ -363,7 +364,7 @@ class TTSTab(QWidget):
     def _on_generate(self):
         error = self._validate()
         if error:
-            QMessageBox.warning(self, "Validation Error", error)
+            QMessageBox.warning(self, tr("validation_error"), error)
             self._log("log_error", f"Validation failed: {error}")
             return
 
@@ -412,7 +413,7 @@ class TTSTab(QWidget):
     def _on_cancel(self):
         if self.worker:
             self.worker.cancel()
-            self.status_label.setText("Cancelling...")
+            self.status_label.setText(tr("cancelling"))
             self._log("log_warning", "Generation cancelled by user")
 
     def _on_progress(self, message: str):

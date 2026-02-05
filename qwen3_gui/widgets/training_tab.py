@@ -13,6 +13,7 @@ from PySide6.QtGui import QFont
 
 from ..constants import DATASETS_DIR
 from ..tooltips import set_tooltip
+from ..translations import tr
 from .output_log import OutputLogWidget
 
 
@@ -29,36 +30,35 @@ class TrainingTab(QWidget):
 
         # Info
         info_label = QLabel(
-            "<b>Voice Model Training</b><br>"
-            "Train a custom voice model using your dataset.<br>"
-            "<i>Note: Training requires significant GPU memory and time.</i>"
+            f"<b>{tr('training_title')}</b><br>"
+            f"{tr('training_info')}"
         )
         info_label.setWordWrap(True)
         layout.addWidget(info_label)
 
         # Dataset selection
-        dataset_group = QGroupBox("Dataset")
+        dataset_group = QGroupBox(tr("dataset"))
         dataset_layout = QGridLayout(dataset_group)
 
-        dataset_layout.addWidget(QLabel("Select Dataset:"), 0, 0)
+        dataset_layout.addWidget(QLabel(tr("select_dataset")), 0, 0)
         self.dataset_combo = QComboBox()
         self._refresh_datasets()
         dataset_layout.addWidget(self.dataset_combo, 0, 1)
 
-        refresh_btn = QPushButton("Refresh")
+        refresh_btn = QPushButton(tr("refresh"))
         refresh_btn.clicked.connect(self._refresh_datasets)
         dataset_layout.addWidget(refresh_btn, 0, 2)
 
         layout.addWidget(dataset_group)
 
         # Training parameters
-        params_group = QGroupBox("Training Parameters")
+        params_group = QGroupBox(tr("training_params"))
         params_layout = QGridLayout(params_group)
 
         row = 0
 
         # Base model
-        params_layout.addWidget(QLabel("Base Model:"), row, 0)
+        params_layout.addWidget(QLabel(tr("base_model")), row, 0)
         self.base_model_combo = QComboBox()
         self.base_model_combo.addItems([
             "Qwen3-TTS-1.7B (recommended)",
@@ -68,7 +68,7 @@ class TrainingTab(QWidget):
         row += 1
 
         # Epochs
-        epochs_label = QLabel("Epochs:")
+        epochs_label = QLabel(tr("epochs"))
         set_tooltip(epochs_label, "epochs")
         params_layout.addWidget(epochs_label, row, 0)
         self.epochs_spin = QSpinBox()
@@ -78,7 +78,7 @@ class TrainingTab(QWidget):
         row += 1
 
         # Learning rate
-        lr_label = QLabel("Learning Rate:")
+        lr_label = QLabel(tr("learning_rate"))
         set_tooltip(lr_label, "learning_rate")
         params_layout.addWidget(lr_label, row, 0)
         self.lr_spin = QDoubleSpinBox()
@@ -90,7 +90,7 @@ class TrainingTab(QWidget):
         row += 1
 
         # Batch size
-        batch_label = QLabel("Batch Size:")
+        batch_label = QLabel(tr("batch_size"))
         set_tooltip(batch_label, "batch_size")
         params_layout.addWidget(batch_label, row, 0)
         self.batch_spin = QSpinBox()
@@ -100,7 +100,7 @@ class TrainingTab(QWidget):
         row += 1
 
         # Output model name
-        params_layout.addWidget(QLabel("Output Model Name:"), row, 0)
+        params_layout.addWidget(QLabel(tr("output_model_name")), row, 0)
         self.model_name_edit = QLineEdit()
         self.model_name_edit.setPlaceholderText("my_custom_voice")
         params_layout.addWidget(self.model_name_edit, row, 1)
@@ -110,7 +110,7 @@ class TrainingTab(QWidget):
         # Training controls
         controls_layout = QHBoxLayout()
 
-        self.train_btn = QPushButton("Start Training")
+        self.train_btn = QPushButton(tr("start_training"))
         self.train_btn.setStyleSheet("""
             QPushButton {
                 background-color: #059669;
@@ -130,7 +130,7 @@ class TrainingTab(QWidget):
         self.train_btn.clicked.connect(self._start_training)
         controls_layout.addWidget(self.train_btn)
 
-        self.stop_btn = QPushButton("Stop Training")
+        self.stop_btn = QPushButton(tr("stop_training"))
         self.stop_btn.setEnabled(False)
         controls_layout.addWidget(self.stop_btn)
 
@@ -143,7 +143,7 @@ class TrainingTab(QWidget):
         layout.addWidget(self.progress_bar)
 
         # Training log
-        log_group = QGroupBox("Training Log")
+        log_group = QGroupBox(tr("training_log"))
         log_layout = QVBoxLayout(log_group)
 
         self.log_text = QTextEdit()
@@ -170,12 +170,12 @@ class TrainingTab(QWidget):
     def _start_training(self):
         dataset = self.dataset_combo.currentText()
         if not dataset:
-            QMessageBox.warning(self, "No Dataset", "Please select or create a dataset first.")
+            QMessageBox.warning(self, tr("no_dataset"), tr("no_dataset_msg"))
             return
 
         model_name = self.model_name_edit.text().strip()
         if not model_name:
-            QMessageBox.warning(self, "No Model Name", "Please enter a name for the output model.")
+            QMessageBox.warning(self, tr("no_model_name"), tr("no_model_name_msg"))
             return
 
         self.log_text.clear()
@@ -184,9 +184,7 @@ class TrainingTab(QWidget):
         self._log("log", f"Epochs: {self.epochs_spin.value()}")
         self._log("log", f"Learning Rate: {self.lr_spin.value()}")
         self._log("log", f"Batch Size: {self.batch_spin.value()}")
-        self._log("log_warning", "Full training implementation requires additional setup.")
-        self._log("log", "This feature is a placeholder for the training pipeline.")
-        self._log("log", "See qwen-tts documentation for training instructions.")
+        self._log("log_warning", tr("training_placeholder"))
 
         # TODO: Implement actual training pipeline
         # This would typically involve:

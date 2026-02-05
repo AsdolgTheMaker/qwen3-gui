@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 
 from ..constants import DATASETS_DIR
+from ..translations import tr
 
 
 class DatasetBuilderTab(QWidget):
@@ -28,9 +29,8 @@ class DatasetBuilderTab(QWidget):
 
         # Instructions
         info_label = QLabel(
-            "<b>Dataset Builder</b><br>"
-            "Build a dataset for voice training by matching audio files with their transcripts.<br>"
-            "You can import audio files and manually transcribe them, or import existing transcript files."
+            f"<b>{tr('dataset_builder_title')}</b><br>"
+            f"{tr('dataset_builder_info')}"
         )
         info_label.setWordWrap(True)
         layout.addWidget(info_label)
@@ -38,15 +38,15 @@ class DatasetBuilderTab(QWidget):
         # Import buttons
         import_layout = QHBoxLayout()
 
-        import_audio_btn = QPushButton("Import Audio Files...")
+        import_audio_btn = QPushButton(tr("import_audio_files"))
         import_audio_btn.clicked.connect(self._import_audio)
         import_layout.addWidget(import_audio_btn)
 
-        import_transcript_btn = QPushButton("Import Transcript File...")
+        import_transcript_btn = QPushButton(tr("import_transcript"))
         import_transcript_btn.clicked.connect(self._import_transcript)
         import_layout.addWidget(import_transcript_btn)
 
-        import_folder_btn = QPushButton("Import Audio Folder...")
+        import_folder_btn = QPushButton(tr("import_folder"))
         import_folder_btn.clicked.connect(self._import_folder)
         import_layout.addWidget(import_folder_btn)
 
@@ -56,7 +56,7 @@ class DatasetBuilderTab(QWidget):
         # Dataset table
         self.table = QTableWidget()
         self.table.setColumnCount(4)
-        self.table.setHorizontalHeaderLabels(["Audio File", "Duration", "Transcript", "Actions"])
+        self.table.setHorizontalHeaderLabels([tr("col_audio_file"), tr("col_duration"), tr("col_transcript"), tr("col_actions")])
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
@@ -64,23 +64,23 @@ class DatasetBuilderTab(QWidget):
         layout.addWidget(self.table)
 
         # Dataset info
-        self.info_label = QLabel("Dataset: 0 entries, 0:00 total duration")
+        self.info_label = QLabel(tr("dataset_info", count=0, duration="0:00"))
         layout.addWidget(self.info_label)
 
         # Save options
         save_layout = QHBoxLayout()
 
-        save_layout.addWidget(QLabel("Dataset Name:"))
+        save_layout.addWidget(QLabel(tr("dataset_name")))
         self.dataset_name_edit = QLineEdit()
         self.dataset_name_edit.setPlaceholderText("my_voice_dataset")
         self.dataset_name_edit.setMaximumWidth(200)
         save_layout.addWidget(self.dataset_name_edit)
 
-        save_btn = QPushButton("Save Dataset")
+        save_btn = QPushButton(tr("save_dataset"))
         save_btn.clicked.connect(self._save_dataset)
         save_layout.addWidget(save_btn)
 
-        clear_btn = QPushButton("Clear All")
+        clear_btn = QPushButton(tr("clear_all"))
         clear_btn.clicked.connect(self._clear_all)
         save_layout.addWidget(clear_btn)
 
@@ -89,14 +89,14 @@ class DatasetBuilderTab(QWidget):
 
     def _import_audio(self):
         files, _ = QFileDialog.getOpenFileNames(
-            self, "Select Audio Files",
+            self, tr("select_audio_files"),
             "", "Audio Files (*.wav *.flac *.mp3 *.ogg);;All Files (*.*)"
         )
         for f in files:
             self._add_entry(f, "")
 
     def _import_folder(self):
-        folder = QFileDialog.getExistingDirectory(self, "Select Audio Folder")
+        folder = QFileDialog.getExistingDirectory(self, tr("select_audio_folder"))
         if folder:
             folder_path = Path(folder)
             audio_extensions = {".wav", ".flac", ".mp3", ".ogg"}
@@ -106,7 +106,7 @@ class DatasetBuilderTab(QWidget):
 
     def _import_transcript(self):
         file, _ = QFileDialog.getOpenFileName(
-            self, "Select Transcript File",
+            self, tr("select_transcript"),
             "", "Text Files (*.txt *.csv);;All Files (*.*)"
         )
         if file:
@@ -121,7 +121,7 @@ class DatasetBuilderTab(QWidget):
                             if audio_path.exists():
                                 self._add_entry(str(audio_path), transcript.strip())
             except Exception as e:
-                QMessageBox.warning(self, "Import Error", f"Failed to import transcript: {e}")
+                QMessageBox.warning(self, tr("import_error"), f"Failed to import transcript: {e}")
 
     def _add_entry(self, audio_path: str, transcript: str):
         row = self.table.rowCount()
@@ -148,7 +148,7 @@ class DatasetBuilderTab(QWidget):
         actions_layout = QHBoxLayout(actions_widget)
         actions_layout.setContentsMargins(4, 0, 4, 0)
 
-        play_btn = QPushButton("Play")
+        play_btn = QPushButton(tr("play"))
         play_btn.setMaximumWidth(50)
         play_btn.clicked.connect(lambda checked, r=row: self._play_row(r))
         actions_layout.addWidget(play_btn)
@@ -206,7 +206,7 @@ class DatasetBuilderTab(QWidget):
                 except Exception:
                     pass
         mins, secs = divmod(total_duration, 60)
-        self.info_label.setText(f"Dataset: {count} entries, {mins}:{secs:02d} total duration")
+        self.info_label.setText(tr("dataset_info", count=count, duration=f"{mins}:{secs:02d}"))
 
     def _save_dataset(self):
         name = self.dataset_name_edit.text().strip() or "dataset"
@@ -228,12 +228,12 @@ class DatasetBuilderTab(QWidget):
                         shutil.copy2(audio_path, dest_audio)
                     f.write(f"{dest_audio.name}|{transcript}\n")
 
-        QMessageBox.information(self, "Dataset Saved", f"Dataset saved to:\n{dataset_path}")
+        QMessageBox.information(self, tr("dataset_saved"), f"{tr('dataset_saved_to')}\n{dataset_path}")
 
     def _clear_all(self):
         reply = QMessageBox.question(
-            self, "Clear Dataset",
-            "Are you sure you want to clear all entries?",
+            self, tr("clear_dataset"),
+            tr("clear_confirm"),
             QMessageBox.Yes | QMessageBox.No
         )
         if reply == QMessageBox.Yes:

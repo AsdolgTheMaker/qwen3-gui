@@ -11,6 +11,8 @@ from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QFont
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 
+from ..translations import tr
+
 
 class MediaPlayerWidget(QFrame):
     """Built-in media player for testing generated audio."""
@@ -26,12 +28,12 @@ class MediaPlayerWidget(QFrame):
         layout.setContentsMargins(10, 10, 10, 10)
 
         # Title
-        title = QLabel("Audio Player")
+        title = QLabel(tr("audio_player"))
         title.setFont(QFont("Segoe UI", 11, QFont.Bold))
         layout.addWidget(title)
 
         # File label
-        self.file_label = QLabel("No file loaded")
+        self.file_label = QLabel(tr("no_file_loaded"))
         self.file_label.setStyleSheet("color: #666;")
         layout.addWidget(self.file_label)
 
@@ -59,12 +61,12 @@ class MediaPlayerWidget(QFrame):
         # Control buttons
         btn_layout = QHBoxLayout()
 
-        self.btn_play = QPushButton("Play")
+        self.btn_play = QPushButton(tr("play"))
         self.btn_play.setEnabled(False)
         self.btn_play.clicked.connect(self._toggle_play)
         btn_layout.addWidget(self.btn_play)
 
-        self.btn_stop = QPushButton("Stop")
+        self.btn_stop = QPushButton(tr("stop"))
         self.btn_stop.setEnabled(False)
         self.btn_stop.clicked.connect(self._stop)
         btn_layout.addWidget(self.btn_stop)
@@ -72,7 +74,7 @@ class MediaPlayerWidget(QFrame):
         btn_layout.addStretch()
 
         # Volume
-        btn_layout.addWidget(QLabel("Vol:"))
+        btn_layout.addWidget(QLabel(tr("vol")))
         self.volume_slider = QSlider(Qt.Horizontal)
         self.volume_slider.setMaximumWidth(100)
         self.volume_slider.setRange(0, 100)
@@ -123,6 +125,6 @@ class MediaPlayerWidget(QFrame):
 
     def _state_changed(self, state):
         if state == QMediaPlayer.PlayingState:
-            self.btn_play.setText("Pause")
+            self.btn_play.setText(tr("pause"))
         else:
-            self.btn_play.setText("Play")
+            self.btn_play.setText(tr("play"))
