@@ -157,6 +157,12 @@ class TTSTab(QWidget):
         self.ref_browse_btn.clicked.connect(self._browse_ref)
         ref_file_layout.addWidget(self.ref_browse_btn)
 
+        self.ref_play_btn = QPushButton("\u25b6")
+        self.ref_play_btn.setMaximumWidth(30)
+        self.ref_play_btn.setToolTip(tr("play"))
+        self.ref_play_btn.clicked.connect(self._play_ref_audio)
+        ref_file_layout.addWidget(self.ref_play_btn)
+
         ref_layout.addLayout(ref_file_layout)
 
         ref_text_header = QHBoxLayout()
@@ -384,6 +390,16 @@ class TTSTab(QWidget):
         )
         if path:
             self.ref_path_edit.setText(path)
+
+    def _play_ref_audio(self):
+        """Play the reference audio file."""
+        ref_path = self.ref_path_edit.text().strip()
+        if not ref_path:
+            return
+        if not Path(ref_path).is_file():
+            self._set_status(tr("error_ref_not_found"))
+            return
+        self.media_player.load_file(ref_path)
 
     def _transcribe_ref_audio(self):
         """Transcribe the reference audio file."""
