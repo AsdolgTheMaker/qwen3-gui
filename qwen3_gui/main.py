@@ -3,8 +3,9 @@ Application entry point and main function.
 """
 
 import sys
+import os
 
-# Apply HF cache setting FIRST, before any other imports that might load huggingface_hub
+# Apply HF cache setting (in case run.py didn't set it, e.g., running main.py directly)
 from .settings import get_hf_cache_path, apply_hf_cache_env
 apply_hf_cache_env(get_hf_cache_path())
 

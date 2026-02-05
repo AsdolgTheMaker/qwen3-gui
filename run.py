@@ -23,6 +23,29 @@ from urllib.request import urlopen, Request
 from urllib.error import URLError
 
 SCRIPT_DIR = Path(__file__).parent.absolute()
+
+# ---------------------------------------------------------------------------
+# CRITICAL: Set HuggingFace cache env vars BEFORE any imports that might
+# trigger huggingface_hub or transformers (e.g., qwen_tts).
+# These libraries cache the path at import time!
+# ---------------------------------------------------------------------------
+def _apply_hf_cache_early():
+    """Set HF cache env vars from settings before any HF imports."""
+    settings_path = SCRIPT_DIR / ".settings.json"
+    try:
+        if settings_path.exists():
+            data = json.loads(settings_path.read_text(encoding="utf-8"))
+            cache_path = data.get("hf_cache_path", "")
+            if cache_path:
+                hub_path = str(Path(cache_path) / "hub")
+                os.environ["HF_HOME"] = cache_path
+                os.environ["HF_HUB_CACHE"] = hub_path
+                os.environ["HUGGINGFACE_HUB_CACHE"] = hub_path
+                os.environ["TRANSFORMERS_CACHE"] = hub_path
+    except Exception:
+        pass
+
+_apply_hf_cache_early()
 VENV_DIR = SCRIPT_DIR / ".venv"
 PACKAGE_DIR = SCRIPT_DIR / "qwen3_gui"
 VERSION_FILE = PACKAGE_DIR / "__init__.py"

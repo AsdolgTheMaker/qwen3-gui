@@ -7,7 +7,6 @@ import soundfile as sf
 from PySide6.QtCore import QThread, Signal
 
 from .constants import MODELS, mode_of
-from .settings import get_hf_cache_path, apply_hf_cache_env
 
 
 class GenerationWorker(QThread):
@@ -28,9 +27,6 @@ class GenerationWorker(QThread):
 
     def run(self):
         try:
-            # Apply HF cache setting BEFORE importing qwen_tts
-            apply_hf_cache_env(get_hf_cache_path())
-
             from qwen_tts import Qwen3TTSModel
 
             model_label = self.params["model_label"]

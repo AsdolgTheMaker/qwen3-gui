@@ -868,8 +868,8 @@ How many audio clips the AI looks at simultaneously.<br><br>
         "ru": "Папка для загрузки и кэширования моделей ИИ. Устанавливает переменную окружения HF_HOME.",
     },
     "hf_cache_note": {
-        "en": "Changes apply immediately. Existing cached models are not moved automatically.",
-        "ru": "Изменения применяются сразу. Существующие модели не перемещаются автоматически.",
+        "en": "Requires restart to take effect. Existing cached models are not moved automatically.",
+        "ru": "Требуется перезапуск для применения. Существующие модели не перемещаются автоматически.",
     },
     "update_settings": {
         "en": "Updates",
@@ -888,8 +888,8 @@ How many audio clips the AI looks at simultaneously.<br><br>
         "ru": "Настройки сохранены",
     },
     "settings_saved_msg": {
-        "en": "Settings have been saved successfully.",
-        "ru": "Настройки успешно сохранены.",
+        "en": "Settings have been saved. Restart the application for cache path changes to take effect.",
+        "ru": "Настройки сохранены. Перезапустите приложение для применения изменений пути кэша.",
     },
     "select_hf_cache_dir": {
         "en": "Select HuggingFace Cache Directory",

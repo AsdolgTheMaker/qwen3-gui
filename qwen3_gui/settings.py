@@ -55,8 +55,12 @@ def apply_hf_cache_env(path: str):
     if path:
         p = Path(path)
         p.mkdir(parents=True, exist_ok=True)
-        # HF_HOME is the main variable - others derive from it
+
+        # Set ALL cache-related environment variables
         os.environ["HF_HOME"] = path
+        os.environ["HF_HUB_CACHE"] = str(p / "hub")
+        os.environ["HUGGINGFACE_HUB_CACHE"] = str(p / "hub")
+        os.environ["TRANSFORMERS_CACHE"] = str(p / "hub")
 
         # If huggingface_hub was already imported, reload its constants
         # to pick up the new env var value
@@ -65,3 +69,9 @@ def apply_hf_cache_env(path: str):
             import importlib
             from huggingface_hub import constants
             importlib.reload(constants)
+
+        # Also reload transformers cache if already imported
+        if "transformers.utils.hub" in sys.modules:
+            import importlib
+            import transformers.utils.hub as transformers_hub
+            importlib.reload(transformers_hub)
