@@ -24,6 +24,9 @@ datasets/
 # Trained models (large files)
 trained_models/
 
+# HuggingFace model cache (large files)
+hf_models/
+
 # IDE
 .idea/
 .vscode/

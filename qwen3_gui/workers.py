@@ -2,6 +2,15 @@
 Background worker threads for Qwen3-TTS GUI.
 """
 
+import os
+from pathlib import Path
+
+# Set HuggingFace cache to app folder before any HF imports
+_HF_CACHE = Path(__file__).parent.parent / "hf_models"
+_HF_CACHE.mkdir(exist_ok=True)
+os.environ["HF_HOME"] = str(_HF_CACHE)
+os.environ["HUGGINGFACE_HUB_CACHE"] = str(_HF_CACHE)
+
 import torch
 import soundfile as sf
 from PySide6.QtCore import QThread, Signal
