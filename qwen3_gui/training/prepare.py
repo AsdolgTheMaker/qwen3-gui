@@ -90,8 +90,11 @@ def prepare_training_data(
     if progress_callback:
         progress_callback(f"Loading tokenizer ({TOKENIZER_MODEL})...")
 
-    # Load tokenizer with device_map for GPU support
-    tokenizer = Qwen3TTSTokenizer.from_pretrained(TOKENIZER_MODEL, device_map=device)
+    try:
+        tokenizer = Qwen3TTSTokenizer.from_pretrained(TOKENIZER_MODEL, local_files_only=True)
+    except Exception:
+        # Fall back to downloading if not cached
+        tokenizer = Qwen3TTSTokenizer.from_pretrained(TOKENIZER_MODEL)
 
     # Load input data
     data_list = []
@@ -108,13 +111,12 @@ def prepare_training_data(
     # Process one at a time to avoid memory issues and handle errors gracefully
     for idx, item in enumerate(data_list):
         try:
-            result = tokenizer.encode([item["audio"]])
+            result = tokenizer.encode(item["audio"])
             # result.audio_codes is a list of tensors, one per input audio
-            # Each tensor has shape [num_codebooks, num_frames]
+            # Each tensor has shape [frames, num_codebooks] e.g. [110, 16]
             audio_codes = result.audio_codes[0]  # Get first (only) result
             enriched = item.copy()
-            # Transpose to [frames, codebooks] for easier processing later
-            enriched["audio_codes"] = audio_codes.T.cpu().tolist()
+            enriched["audio_codes"] = audio_codes.cpu().tolist()
             output_data.append(enriched)
 
             if progress_callback and (idx + 1) % 10 == 0:

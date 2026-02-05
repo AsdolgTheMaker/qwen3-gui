@@ -18,7 +18,7 @@ OUTPUT_DIR = SCRIPT_DIR / "output"
 # Application info
 # ---------------------------------------------------------------------------
 
-APP_VERSION = "1.6.0"
+APP_VERSION = "1.7.0"
 GITHUB_REPO = "AsdolgTheMaker/qwen3-gui"
 UPDATE_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 
