@@ -283,6 +283,7 @@ class DatasetBuilderTab(QWidget):
             QMessageBox.warning(self, tr("transcribe"), tr("transcribe_in_progress"))
             return
 
+        self._transcribe_file_count = len(files)
         self.transcribe_progress.setRange(0, len(files))
         self.transcribe_progress.setValue(0)
         self.transcribe_progress.setFormat(tr("transcribing") + " %v/%m")
@@ -299,6 +300,21 @@ class DatasetBuilderTab(QWidget):
     def _on_transcribe_progress(self, message: str):
         """Handle transcription progress."""
         self.transcribe_progress.setFormat(message)
+        # Parse download percentage if present (e.g., "Downloading: 50%")
+        if "%" in message and "Downloading" in message:
+            import re
+            match = re.search(r'(\d+)%', message)
+            if match:
+                pct = int(match.group(1))
+                # Switch to 0-100 range for download progress
+                if self.transcribe_progress.maximum() != 100:
+                    self.transcribe_progress.setRange(0, 100)
+                self.transcribe_progress.setValue(pct)
+        elif "Transcribing" in message:
+            # Reset to file count range when actual transcription starts
+            if self.transcribe_progress.maximum() == 100:
+                self.transcribe_progress.setRange(0, self._transcribe_file_count)
+                self.transcribe_progress.setValue(0)
 
     def _on_transcribe_result(self, row: int, transcription: str):
         """Handle transcription result for a row."""
