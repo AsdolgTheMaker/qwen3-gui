@@ -8,6 +8,7 @@ from PySide6.QtCore import QThread, Signal
 from contextlib import contextmanager
 
 from .constants import MODELS, mode_of
+from .settings import get_whisper_model
 
 
 def _format_size(size_bytes):
@@ -229,7 +230,7 @@ class TranscriptionWorker(QThread):
     finished = Signal(bool, str)  # success, message
 
     # Shared model holder to avoid reloading
-    _model_holder = {"model": None, "processor": None}
+    _model_holder = {"model": None, "processor": None, "model_id": None}
 
     def __init__(self, audio_files: list, language: str = None):
         """
@@ -250,17 +251,20 @@ class TranscriptionWorker(QThread):
         try:
             import librosa
 
-            # Lazy load model
-            if self._model_holder["model"] is None:
-                self.progress.emit("Loading Whisper model...")
-                from transformers import WhisperProcessor, WhisperForConditionalGeneration
+            # Get configured Whisper model
+            model_id = get_whisper_model()
 
-                model_id = "openai/whisper-base"
+            # Lazy load model (reload if model changed)
+            if self._model_holder["model"] is None or self._model_holder["model_id"] != model_id:
+                self.progress.emit(f"Loading Whisper model ({model_id.split('/')[-1]})...")
+                from transformers import WhisperProcessor, WhisperForConditionalGeneration
 
                 # Redirect download progress to our signal
                 with redirect_hf_progress(self.progress.emit):
                     self._model_holder["processor"] = WhisperProcessor.from_pretrained(model_id)
                     self._model_holder["model"] = WhisperForConditionalGeneration.from_pretrained(model_id)
+
+                self._model_holder["model_id"] = model_id
 
                 if torch.cuda.is_available():
                     self._model_holder["model"] = self._model_holder["model"].to("cuda")

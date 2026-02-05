@@ -50,6 +50,16 @@ def set_hf_cache_path(path: str):
     _save_settings({"hf_cache_path": path})
 
 
+def get_whisper_model() -> str:
+    """Get Whisper model ID from settings."""
+    return _load_settings().get("whisper_model", "openai/whisper-base")
+
+
+def set_whisper_model(model_id: str):
+    """Save Whisper model ID."""
+    _save_settings({"whisper_model": model_id})
+
+
 def apply_hf_cache_env(path: str):
     """Apply HuggingFace cache path to environment variables."""
     if path:

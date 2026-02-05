@@ -923,6 +923,22 @@ How many audio clips the AI looks at simultaneously.<br><br>
         "en": "Select HuggingFace Cache Directory",
         "ru": "Выберите папку кэша HuggingFace",
     },
+    "whisper_settings": {
+        "en": "Transcription (Whisper)",
+        "ru": "Транскрипция (Whisper)",
+    },
+    "whisper_description": {
+        "en": "Whisper model used for automatic transcription of audio files.",
+        "ru": "Модель Whisper для автоматической транскрипции аудио.",
+    },
+    "whisper_model": {
+        "en": "Model:",
+        "ru": "Модель:",
+    },
+    "whisper_note": {
+        "en": "Larger models are more accurate but slower and use more memory.",
+        "ru": "Большие модели точнее, но медленнее и требуют больше памяти.",
+    },
 }
 
 
