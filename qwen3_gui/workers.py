@@ -260,7 +260,9 @@ class TranscriptionWorker(QThread):
             model_id = get_whisper_model()
 
             # Lazy load model (reload if model changed)
-            if self._model_holder["model"] is None or self._model_holder["model_id"] != model_id:
+            if (self._model_holder["model"] is None or
+                self._model_holder["processor"] is None or
+                self._model_holder["model_id"] != model_id):
                 self.progress.emit(f"Loading Whisper ({model_id.split('/')[-1]})...")
                 from transformers import WhisperProcessor, WhisperForConditionalGeneration
 
