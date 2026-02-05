@@ -48,18 +48,19 @@ def run_training(
     Returns:
         Path to final checkpoint, or None if cancelled/failed
     """
-    from transformers import AutoProcessor, AutoModel
+    from qwen_tts import Qwen3TTSModel
+    from transformers import AutoProcessor
 
     if progress_callback:
         progress_callback(f"Loading base model: {base_model}...")
 
     # Load model and processor
     processor = AutoProcessor.from_pretrained(base_model, trust_remote_code=True)
-    model = AutoModel.from_pretrained(
+    model = Qwen3TTSModel.from_pretrained(
         base_model,
-        torch_dtype=torch.bfloat16,
-        trust_remote_code=True
-    ).to(device)
+        dtype=torch.bfloat16,
+        device_map=device
+    )
 
     # Enable training mode
     model.train()
