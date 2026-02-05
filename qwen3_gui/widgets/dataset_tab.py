@@ -190,7 +190,7 @@ class DatasetBuilderTab(QWidget):
             main_window = self.window()
             if hasattr(main_window, 'media_player'):
                 main_window.media_player.load_file(audio_path)
-                main_window.media_player.player.play()
+                main_window.media_player._play()
 
     def _delete_row(self, row: int):
         self.table.removeRow(row)

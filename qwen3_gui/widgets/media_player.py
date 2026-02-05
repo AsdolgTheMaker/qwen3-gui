@@ -173,6 +173,12 @@ class MediaPlayerWidget(QFrame):
             self.btn_play.setText(tr("pause"))
             return
 
+        # Stop any existing playback first
+        if self._playing:
+            self._playing = False
+            if self._play_thread and self._play_thread.is_alive():
+                self._play_thread.join(timeout=0.5)
+
         # Start new playback
         self._playing = True
         self._paused = False
@@ -264,6 +270,10 @@ class MediaPlayerWidget(QFrame):
         self._paused = False
         self._position_ms = 0
         self._update_timer.stop()
+
+        # Wait for playback thread to finish
+        if self._play_thread and self._play_thread.is_alive():
+            self._play_thread.join(timeout=0.5)
 
         self.btn_play.setText(tr("play"))
         self.progress_slider.setValue(0)
