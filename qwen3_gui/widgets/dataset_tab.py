@@ -163,13 +163,22 @@ class DatasetBuilderTab(QWidget):
         self._update_info()
 
     def _get_audio_duration(self, path: str) -> str:
+        """Get audio duration using soundfile (no sox required)."""
         try:
-            import librosa
-            duration = librosa.get_duration(path=path)
-            mins, secs = divmod(int(duration), 60)
+            import soundfile as sf
+            info = sf.info(path)
+            mins, secs = divmod(int(info.duration), 60)
             return f"{mins}:{secs:02d}"
         except Exception:
-            return "??:??"
+            # Fallback for .wav files
+            try:
+                import wave
+                with wave.open(path, 'rb') as wf:
+                    duration = wf.getnframes() / float(wf.getframerate())
+                    mins, secs = divmod(int(duration), 60)
+                    return f"{mins}:{secs:02d}"
+            except Exception:
+                return "??:??"
 
     def _play_row(self, row: int):
         item = self.table.item(row, 0)

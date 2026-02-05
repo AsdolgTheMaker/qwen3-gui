@@ -1,0 +1,1 @@
+When comitting changes, make sure to bump up application version, and that your change does not break autoupdater flow.

@@ -284,8 +284,25 @@ def _ensure_deps():
     print("[setup] Installing qwen-tts and PySide6 ...")
     subprocess.check_call([
         str(VENV_PIP), "install",
-        "qwen-tts", "PySide6", "soundfile", "librosa", "requests"
+        "qwen-tts",
+        "PySide6",
+        "PySide6-Addons",  # Includes QtMultimedia plugins
+        "soundfile",
+        "librosa",
+        "requests",
     ])
+
+    # Try to install flash-attn for faster inference (optional, CUDA only)
+    if cuda:
+        print("[setup] Attempting to install flash-attn (optional, may fail) ...")
+        result = subprocess.run(
+            [str(VENV_PIP), "install", "flash-attn", "--no-build-isolation"],
+            capture_output=True,
+        )
+        if result.returncode == 0:
+            print("[setup] flash-attn installed successfully")
+        else:
+            print("[setup] flash-attn installation failed (this is optional, continuing...)")
 
     print("[setup] Dependencies installed successfully.")
 
